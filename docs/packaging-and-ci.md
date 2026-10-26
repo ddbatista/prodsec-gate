@@ -51,7 +51,10 @@ Three steps, in this order, because the order is the argument:
 
 1. **Self-tests** — a tool whose own tests fail has no standing to grade anything.
 2. **End-to-end smoke** — fetch from the bundled demo server and gate it.
-3. **Gate every dump in the repo** — `exit 2` fails the build as hard as `exit 1`.
+3. **Known-vulnerable fixture must GATE** — `tooling/mcp-dump.json` must exit
+   exactly `1`. A `0` means detection regressed; a `2` means the check did not
+   run. In a consuming repo, gate your real dumps instead, where `exit 2` fails
+   the build as hard as `exit 1`.
 
 Also: `permissions: contents: read` at the top, raised per job. That is the L08
 finding applied to what we ship.

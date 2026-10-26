@@ -43,15 +43,15 @@ jobs:
           prodsec-fetch --i-will-execute-this --stdio python3 examples/demo_mcp_server.py \
             | prodsec-gate -
 
-      - name: Gate every MCP dump in the repo
+      # tooling/mcp-dump.json is a deliberately vulnerable fixture: the gate
+      # MUST grade it GATE (exit 1). SHIP (0) means detection regressed;
+      # ERROR (2) means the check did not run. Both fail the build.
+      # In your own repo, gate real dumps with a plain `prodsec-gate <file>`.
+      - name: Known-vulnerable fixture must GATE
         run: |
-          shopt -s nullglob
           rc=0
-          for f in tooling/*dump*.json; do
-            echo "::group::$f"
-            prodsec-gate "$f" || rc=$?
-            echo "::endgroup::"
-          done
-          # exit 2 is a configuration failure and must fail the build just as
-          # hard as a GATE. A check that did not run is not a check that passed.
-          exit $rc
+          prodsec-gate tooling/mcp-dump.json || rc=$?
+          if [ "$rc" -ne 1 ]; then
+            echo "::error::expected GATE (exit 1) on the vulnerable fixture, got exit $rc"
+            exit 1
+          fi
