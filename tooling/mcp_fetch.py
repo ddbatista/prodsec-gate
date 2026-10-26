@@ -31,7 +31,7 @@ import urllib.error
 import urllib.request
 
 PROTOCOL = "2025-06-18"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 CLIENT = {"name": "prodsec-gate", "version": VERSION}
 
 

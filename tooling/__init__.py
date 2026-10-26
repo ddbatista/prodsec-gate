@@ -6,4 +6,4 @@ machine; a security tool that cannot be installed is not a security tool.
 The one path that needs a model lives behind the `[live]` extra and is never
 on a required check.
 """
-__version__ = "0.1.0"
+__version__ = "0.1.1"
