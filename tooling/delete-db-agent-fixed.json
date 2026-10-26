@@ -1,0 +1,21 @@
+{
+  "agent": "cleanup-bot",
+  "description": "Cleanup agent, hardened: scoped soft-delete on a recoverable replica, gated.",
+  "autonomous": true,
+  "human_in_loop": true,
+  "tools": [
+    {
+      "name": "read_cleanup_queue",
+      "description": "Reads the cleanup request queue.",
+      "capabilities": ["untrusted_input"],
+      "reversible": true
+    },
+    {
+      "name": "soft_delete_records",
+      "description": "Marks specific rows deleted on a recoverable replica; 5-min scoped token, no DROP.",
+      "capabilities": ["state_change"],
+      "reversible": true,
+      "scope": "soft-delete:rows matching task_id; replica; token TTL 5m"
+    }
+  ]
+}

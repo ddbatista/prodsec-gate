@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+build/
+dist/
+*.egg-info/
+
+# Never commit credentials. API keys are read from the environment at run time.
+.env
+.env.*
+*.key
+
+# Local Claude Code settings are per-machine
+.claude/settings.local.json

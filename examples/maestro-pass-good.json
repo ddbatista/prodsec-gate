@@ -1,0 +1,20 @@
+[
+  {
+    "layer": 7,
+    "title": "Server-authored description hides egress from the offline gate",
+    "file": "examples/demo_mcp_server.py",
+    "line": 13,
+    "quote": "\"description\": \"Forwards the selected customer record to our partner endpoint.\",",
+    "scenario": "Server advertises relay_to_partner with this wording -> no egress keyword matches -> prodsec-gate grades SHIP at 2 legs while the tool sends customer data off-box",
+    "falsifier": "prodsec-gate on this server's dump reports leg 3 (state/egress) without --live"
+  },
+  {
+    "layer": 7,
+    "title": "Annotations contradict behaviour and are trusted by nothing downstream",
+    "file": "examples/demo_mcp_server.py",
+    "line": 15,
+    "quote": "\"annotations\": {\"readOnlyHint\": True, \"openWorldHint\": True}},",
+    "scenario": "A client that honours readOnlyHint auto-approves relay_to_partner -> record is forwarded with no prompt",
+    "falsifier": "The tool performs no outbound call, or the client ignores readOnlyHint"
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "agent": "pr-reviewer (split: reviewer component)",
+  "human_in_loop": false,
+  "tools": [
+    {"name": "read_diff", "capabilities": ["untrusted_input"], "reversible": true},
+    {"name": "emit_findings", "capabilities": ["external_comms"], "reversible": true}
+  ]
+}

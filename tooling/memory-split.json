@@ -1,0 +1,20 @@
+{
+  "agent": "split-memory-agent",
+  "description": "One tool reads untrusted web; a SEPARATE tool stores only trusted internal config to memory.",
+  "autonomous": true,
+  "human_in_loop": false,
+  "tools": [
+    {
+      "name": "fetch_web_page",
+      "description": "Fetches untrusted web content.",
+      "capabilities": ["untrusted_input"],
+      "reversible": true
+    },
+    {
+      "name": "remember_trusted_config",
+      "description": "Stores ONLY vetted internal config values into persistent memory.",
+      "capabilities": ["persistent_memory"],
+      "reversible": true
+    }
+  ]
+}

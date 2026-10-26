@@ -1,0 +1,57 @@
+# Offline checks only. Nothing here calls a model.
+#
+# The rule this file exists to encode: a REQUIRED check must be free,
+# deterministic, offline and fast. The live classifier (L17) is none of those
+# -- it adds a network call, a credential, money and non-determinism. A gate
+# that fails because someone's API quota ran out teaches people to bypass
+# gates. Run the live pass on a schedule and report it; never block a merge
+# on it.
+name: prodsec-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read          # least privilege; raise per-job only where needed
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # No `pip install -r requirements.txt` because there isn't one.
+      # The offline core is stdlib-only by design -- see prodsec_gate/__init__.py.
+      - name: Install (zero dependencies)
+        run: pip install .
+
+      - name: Self-tests must pass before any verdict is believed
+        run: |
+          prodsec-audit --self-test
+          prodsec-maestro --self-test
+          python3 tooling/policy_guard_hook.py --self-test
+          python3 tooling/audit_allowlist.py --self-test
+
+      - name: End-to-end smoke (no third-party code)
+        run: |
+          set -o pipefail
+          prodsec-fetch --i-will-execute-this --stdio python3 examples/demo_mcp_server.py \
+            | prodsec-gate -
+
+      - name: Gate every MCP dump in the repo
+        run: |
+          shopt -s nullglob
+          rc=0
+          for f in tooling/*dump*.json; do
+            echo "::group::$f"
+            prodsec-gate "$f" || rc=$?
+            echo "::endgroup::"
+          done
+          # exit 2 is a configuration failure and must fail the build just as
+          # hard as a GATE. A check that did not run is not a check that passed.
+          exit $rc

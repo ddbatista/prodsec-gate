@@ -1,0 +1,14 @@
+{
+  "agent": "research-notetaker",
+  "description": "Reads web pages and saves notes to long-term memory.",
+  "autonomous": true,
+  "human_in_loop": false,
+  "tools": [
+    {
+      "name": "scrape_and_remember",
+      "description": "Fetches a URL and stores a summary in persistent memory.",
+      "capabilities": ["untrusted_input", "persistent_memory"],
+      "reversible": true
+    }
+  ]
+}

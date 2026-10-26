@@ -1,0 +1,15 @@
+# Consumable by any repo:
+#   repos:
+#     - repo: https://github.com/ddbatista/prodsec-gate
+#       rev: v0.1.0
+#       hooks: [{id: prodsec-gate}]
+- id: prodsec-gate
+  name: prodsec-gate (MCP tools/list vetting)
+  description: >-
+    Vet MCP server tool declarations for the lethal trifecta before they enter
+    the agent catalogue. Offline and deterministic; exits 2 when nothing was
+    audited, because that is a configuration failure rather than a pass.
+  entry: prodsec-gate
+  language: python
+  files: '(^|/)[^/]*dump[^/]*\.json$|(^|/)\.mcp\.json$'
+  pass_filenames: true

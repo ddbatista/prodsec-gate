@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prodsec-gate"
+version = "0.1.0"
+description = "Agentic-security triage and gating tools (lethal trifecta, Rule of Two, MCP vetting, MAESTRO scoring)"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+readme = "README.md"
+# NO dependencies, on purpose. See prodsec_gate/__init__.py.
+dependencies = []
+
+[project.optional-dependencies]
+# The live classifier only. Never install either of these in a required CI
+# check: they add a network call, a credential, money and non-determinism.
+#
+# live      -> the DEFAULT backend. Claude Code as a library, so it uses Claude
+#              Code's credentials. Locked to zero tools by agent_sdk_backend.py,
+#              and the lockdown is verified before each run.
+# live-api  -> the alternative. One message, no tool surface to cage, but it
+#              needs its own ANTHROPIC_API_KEY.
+live = ["claude-agent-sdk>=0.2"]
+live-api = ["anthropic>=1.0"]
+
+[project.urls]
+Homepage = "https://github.com/ddbatista/prodsec-gate"
+
+[project.scripts]
+prodsec-gate      = "prodsec_gate.gate:main"
+prodsec-fetch     = "prodsec_gate.mcp_fetch:main"
+prodsec-triage    = "prodsec_gate.triage:main"
+prodsec-adapter   = "prodsec_gate.mcp_adapter:main"
+prodsec-audit     = "prodsec_gate.audit_agent_config:main"
+prodsec-allowlist = "prodsec_gate.audit_allowlist:main"
+prodsec-maestro   = "prodsec_gate.maestro_score:main"
+
+[tool.setuptools]
+packages = ["prodsec_gate"]
+
+[tool.setuptools.package-dir]
+prodsec_gate = "tooling"

@@ -1,0 +1,63 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "search_web",
+        "title": "Web Search",
+        "description": "Search the public web and return the contents of matching pages.",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "query": { "type": "string" } },
+          "required": ["query"]
+        },
+        "annotations": { "readOnlyHint": true, "openWorldHint": true }
+      },
+      {
+        "name": "read_repo_file",
+        "title": "Read Repository File",
+        "description": "Read a file from the connected private repository.",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "path": { "type": "string" } },
+          "required": ["path"]
+        },
+        "annotations": { "readOnlyHint": true, "openWorldHint": false }
+      },
+      {
+        "name": "delete_branch",
+        "title": "Delete Branch",
+        "description": "Permanently delete a git branch and all of its unmerged commits.",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "branch": { "type": "string" } },
+          "required": ["branch"]
+        },
+        "annotations": { "readOnlyHint": false, "destructiveHint": true, "openWorldHint": false }
+      },
+      {
+        "name": "export_to_webhook",
+        "title": "Export Data",
+        "description": "Send selected repository data to an external webhook URL.",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "url": { "type": "string" }, "data": { "type": "string" } },
+          "required": ["url", "data"]
+        },
+        "annotations": { "readOnlyHint": false, "openWorldHint": true }
+      },
+      {
+        "name": "sync_settings",
+        "title": "Sync Settings",
+        "description": "Updates and overwrites local configuration files to match remote.",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "source": { "type": "string" } },
+          "required": ["source"]
+        },
+        "annotations": { "readOnlyHint": true, "openWorldHint": false }
+      }
+    ]
+  }
+}

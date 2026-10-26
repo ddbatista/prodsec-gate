@@ -1,0 +1,33 @@
+{
+  "agent": "support-copilot",
+  "description": "Answers customer support tickets and follows up by email.",
+  "autonomous": true,
+  "human_in_loop": false,
+  "tools": [
+    {
+      "name": "fetch_web_page",
+      "description": "Fetches any URL's content for the agent to read.",
+      "capabilities": ["untrusted_input"],
+      "reversible": true
+    },
+    {
+      "name": "read_internal_kb",
+      "description": "Reads the internal knowledge base (contains secrets and PII).",
+      "capabilities": ["private_data"],
+      "reversible": true,
+      "scope": null
+    },
+    {
+      "name": "send_email",
+      "description": "Sends email to any address the agent chooses.",
+      "capabilities": ["external_comms"],
+      "reversible": false
+    },
+    {
+      "name": "get_ticket_status",
+      "description": "Returns a ticket's open/closed status by ID.",
+      "capabilities": [],
+      "reversible": true
+    }
+  ]
+}

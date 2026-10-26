@@ -1,0 +1,21 @@
+{
+  "agent": "cleanup-bot",
+  "description": "Takes an internal cleanup request and deletes stale records.",
+  "autonomous": true,
+  "human_in_loop": false,
+  "tools": [
+    {
+      "name": "read_cleanup_queue",
+      "description": "Reads the cleanup request queue (fed by an internal ticket form customers can write into).",
+      "capabilities": ["untrusted_input"],
+      "reversible": true
+    },
+    {
+      "name": "delete_records",
+      "description": "Hard-deletes database records matching a query.",
+      "capabilities": ["state_change"],
+      "reversible": false,
+      "scope": null
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "agent": "pr-reviewer (monolithic)",
+  "human_in_loop": false,
+  "tools": [
+    {"name": "read_diff",  "capabilities": ["untrusted_input"], "reversible": true},
+    {"name": "read_repo",  "capabilities": ["private_data"],    "reversible": true},
+    {"name": "post_comment","capabilities": ["external_comms"], "reversible": true}
+  ]
+}

@@ -1,0 +1,17 @@
+[
+  {"layer": 4,
+   "title": "Gate states its own recall floor (line number is stale)",
+   "file": "tooling/gate.py", "line": 12,
+   "quote": "FLOOR_RECALL = \"62.5%\"",
+   "scenario": "Reader trusts SHIP from the offline floor -> misses 37.5% of legs",
+   "falsifier": "The floor's measured recall on the corpus is 100%"},
+  {"layer": 3,
+   "title": "Invented quote",
+   "file": "tooling/gate.py", "line": 51,
+   "quote": "ALLOW_ALL = True",
+   "scenario": "n/a",
+   "falsifier": "n/a"},
+  {"layer": 2,
+   "title": "Missing citation and falsifier",
+   "scenario": "Model wrote prose instead of evidence"}
+]
