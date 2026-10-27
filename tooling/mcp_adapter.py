@@ -15,7 +15,7 @@ Two hard truths baked in here:
      So we lead with name/description and treat annotations as a cross-check —
      and we LOUDLY flag when an annotation contradicts the inferred behaviour.
 
-Usage:
+Usage (the command is a DEPRECATED alias -- use `prodsec-gate --json`):
     python3 mcp_adapter.py mcp-dump.json            # prints a triage manifest
     python3 mcp_adapter.py mcp-dump.json | python3 triage.py -
 
@@ -260,20 +260,20 @@ def build_manifest(dump, backend=None, name="mcp-server", classifier=None,
 
 @_cli.entrypoint
 def main(argv=None):
+    """prodsec-adapter: DEPRECATED alias of `prodsec-gate --json`.
+
+    Same manifest on stdout. Exits 0 whenever a manifest was produced -- even
+    one that would GATE -- because the adapter never had a finding state and
+    `prodsec-adapter dump | prodsec-triage -` pipelines must not start failing.
+    Anything else is 2.
+    """
+    import gate                  # gate imports this module; import lazily
     argv = sys.argv[1:] if argv is None else argv
-    if not argv or argv[0] in ("-h", "--help"):
-        print(__doc__)
-        return _cli.SHIP if argv else _cli.ERROR
-    try:
-        manifest = build_manifest(_cli.read_json(argv[0]))
-    except ValueError as e:
-        raise _cli.NotAudited(str(e))
-    # No finding state here, so the only honest codes are "produced a
-    # manifest" (0) and "did not" (2). An empty one is the latter.
-    if not manifest["tools"]:
-        raise _cli.NotAudited("the dump contains no tools. Nothing was audited.")
-    print(json.dumps(manifest, indent=2, ensure_ascii=False))
-    return _cli.SHIP
+    print("WARNING: prodsec-adapter is deprecated and will be removed in a later\n"
+          "         release. Use `prodsec-gate --json`: same manifest, plus the\n"
+          "         verdict, and it exits with the verdict's code.", file=sys.stderr)
+    rc = gate.main(list(argv) + ["--json"])
+    return _cli.SHIP if rc in (_cli.SHIP, _cli.GATE) else _cli.ERROR
 
 
 if __name__ == "__main__":

@@ -116,7 +116,9 @@ class NotAuditedContract(unittest.TestCase):
                 p = run(command, *argv, stdin=stdin)
                 self.assertEqual(p.returncode, ERROR, p.stdout + p.stderr)
                 self.assertNotIn("Traceback", p.stderr)
-                self.assertTrue(p.stderr.startswith("ERROR:"), p.stderr)
+                # An ERROR: line, not necessarily the first: a deprecation
+                # warning may come before it.
+                self.assertRegex(p.stderr, r"(?m)^ERROR:")
                 self.assertIn(says, p.stderr)
 
 

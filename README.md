@@ -37,7 +37,7 @@ the pipeline, not fixed. The one path that needs a model lives behind the
 | `prodsec-fetch` | Capture a live MCP server's `tools/list` | [docs](docs/prodsec-fetch.md) |
 | `prodsec-gate` | Vet that dump → verdict → exit code | [docs](docs/prodsec-gate.md) |
 | `prodsec-triage` | Grade a hand-written agent manifest | [tooling](tooling/README.md) |
-| `prodsec-adapter` | Dump → manifest, without the verdict | [tooling](tooling/README.md) |
+| `prodsec-adapter` | **Deprecated** alias of `prodsec-gate --json` (always exits 0 or 2) | [tooling](tooling/README.md) |
 | `prodsec-audit` | Audit Claude Code / Codex / Cursor / your own agent | [tooling](tooling/README.md) |
 | `prodsec-allowlist` | Grade a Claude Code allow-list by blast radius | [tooling](tooling/README.md) |
 | `prodsec-maestro` | Print the MAESTRO pass prompt; score a pass's citations | [docs](docs/maestro-pass.md) |
