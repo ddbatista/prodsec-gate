@@ -69,7 +69,7 @@ Lets any repo consume the gate:
 ```yaml
 repos:
   - repo: https://github.com/ddbatista/prodsec-gate
-    rev: v0.1.1
+    rev: v0.2.0
     hooks: [{id: prodsec-gate}]
 ```
 
