@@ -52,7 +52,7 @@ def semantic_stub(system, payload):
     """A HAND-WRITTEN stand-in for a model. Not a model. See the docstring."""
     t = payload.lower()
     return "\n".join(cap for cap, words in SEMANTIC.items()
-                     if any(w in t for w in words))
+                     if any(w in t for w in words)) or "none"
 
 
 def live_backend(system, payload):
