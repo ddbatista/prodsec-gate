@@ -14,6 +14,7 @@ Two hard truths baked in here:
      annotations to be untrusted unless they come from trusted servers."
      So we lead with name/description and treat annotations as a cross-check —
      and we LOUDLY flag when an annotation contradicts the inferred behaviour.
+     See docs/design-notes.md#annotations-untrusted.
 
 Usage (the command is a DEPRECATED alias -- use `prodsec-gate --json`):
     python3 mcp_adapter.py mcp-dump.json            # prints a triage manifest
@@ -87,45 +88,27 @@ def infer(tool):
 
 
 # ===========================================================================
-#  THE SIGNAL LAYER  (L17)
+#  THE SIGNAL LAYER
 #
-#  X3, from the learner's own MAESTRO pass: infer() derives capabilities from
-#  `name` + `description` + `title` -- every one of which the SERVER OPERATOR
-#  writes. A tool called relay_to_partner that "forwards the selected customer
-#  record to our partner endpoint" gets no external_comms, because "relay",
-#  "forward" and "partner" are in none of the SIGNALS patterns. The manifest
-#  then reports two legs and triage.py prints SHIP.
+#  infer() reads name + description + title, and the SERVER OPERATOR writes all
+#  three: a tool that "forwards the selected customer record to our partner
+#  endpoint" carries no egress keyword, so the floor sees two legs and SHIPs.
+#  A model reads that correctly. It goes in as a SIGNAL THAT CAN ONLY TIGHTEN:
 #
-#  An LLM reads that description correctly. The problem is what putting an LLM
-#  here would normally cost you: this workspace has spent three months
-#  establishing that an LLM in an enforcement path fails property (a) of the
-#  control test, and has criticised two vendors for exactly that (Cursor's
-#  Auto-review in L09, and -- working in our favour, which is the seductive
-#  version -- the safety guardrail that refused 57/60 trials on 2026-09-20).
+#   1. UNION, NEVER SUBTRACT.  caps = keyword_caps | classifier_caps. A fully
+#      compromised classifier can produce a false GATE, never a false SHIP.
+#      See docs/design-notes.md#union-never-subtract.
 #
-#  So the classifier goes in as a SIGNAL THAT CAN ONLY TIGHTEN. Four rules,
-#  each one borrowed from something already built here:
+#   2. FAIL CLOSED.  Unavailable, errored, refused or unparseable output means
+#      the check did not run, which is not a pass: ok=False, and the caller
+#      escalates. See docs/design-notes.md#fail-closed.
 #
-#   1. UNION, NEVER SUBTRACT.  caps = keyword_caps | classifier_caps.
-#      The classifier may add a leg; it can never remove one. This is the hook's
-#      one-way ratchet (L10 D2) applied to a model. The consequence is the whole
-#      design: a fully compromised classifier -- one that has read an injected
-#      tool description and is doing the attacker's bidding -- can produce a
-#      FALSE GATE. It cannot produce a false SHIP. The failure mode is noise,
-#      not exposure.
-#
-#   2. FAIL CLOSED.  Unavailable, errored, or unparseable output does not mean
-#      "no extra legs found". It means the check did not run, which is not a
-#      pass. Returns ok=False and the caller must escalate.
-#
-#   3. CONSTRAINED OUTPUT.  The model may return only names from CAP_VOCAB, one
-#      per line. Anything else is discarded. An injected description cannot make
-#      the classifier emit arbitrary text into your manifest, because there is
-#      nowhere for arbitrary text to go.
+#   3. CONSTRAINED OUTPUT.  Only words from CAP_VOCAB, one per line, or `none`.
+#      Anything else is discarded, so injected text has nowhere to go.
 #
 #   4. THE DESCRIPTION IS DATA.  It arrives delimited, and the system prompt
-#      says so. This is L15 D2's lesson aimed at our own detector: the thing
-#      reading attacker-authored text is itself a leg-1 surface.
+#      says so: the thing reading attacker-authored text is itself an
+#      untrusted-input surface. See docs/design-notes.md#description-is-data.
 #
 #  DISAGREEMENT IS THE PRODUCT. Where keyword and classifier differ is where
 #  the interesting tools are -- that is the output worth reading, not the union.
@@ -231,11 +214,8 @@ def build_manifest(dump, backend=None, name="mcp-server", classifier=None,
     raw = tools_of(dump)
     tools, failed_closed = [], []
     for i, t in enumerate(raw, 1):
-        # The agent-sdk backend spawns a Claude Code CLI subprocess per tool,
-        # ~3.5s each, serially. Three tools is 11 seconds of silence; a 40-tool
-        # server is two minutes of it. Found 2026-09-21 when a run that had not
-        # hung was reasonably assumed to have hung. A gate that looks dead gets
-        # killed, and a killed gate teaches people to stop running it.
+        # The agent-sdk backend takes ~3.5s per tool, serially. A gate that
+        # looks dead gets killed. See docs/design-notes.md#visible-progress.
         if progress:
             print("  [%d/%d] classifying %s ..." % (i, len(raw), t.get("name", "?")),
                   file=sys.stderr, flush=True)

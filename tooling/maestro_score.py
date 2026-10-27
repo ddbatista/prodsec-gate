@@ -2,8 +2,8 @@
 """
 maestro_score.py — score a MAESTRO pass by checking its citations.
 
-The L15 protocol says: constrain the agent's output until being wrong is
-detectable, then SAMPLE AND SCORE. Everyone does the first half, because it is
+The MAESTRO pass protocol says: constrain the agent's output until being wrong
+is detectable, then SAMPLE AND SCORE. Everyone does the first half, because it is
 one paste. Nobody does the second half, because it is ten manual greps.
 
 This is the ten greps. Requirement 1 of the protocol -- `file.py:LINE`, quoted
@@ -12,8 +12,8 @@ the machine that checks it.
 
 WHAT IT CAN DECIDE, AND WHAT IT CANNOT
 --------------------------------------
-Three buckets were specified in reference/maestro-pass.html: REAL, MISCITED,
-FABRICATED. A citation checker can only reach the FABRICATED boundary:
+The protocol specifies three buckets: REAL, MISCITED, FABRICATED. A citation
+checker can only reach the FABRICATED boundary:
 
     FABRICATED   the file, the line, or the quoted text does not exist
     MISPLACED    the quote exists in the file, but not at the cited line
@@ -25,6 +25,7 @@ The dangerous bucket -- MISCITED, where the concern is reasonable and the line
 does not support it -- lives INSIDE the CITED pile and needs a human. This tool
 prints that limit on every run rather than leaving it in the docs, for the same
 reason gate.py prints its INSTRUMENT block: a verdict must carry its instrument.
+See docs/design-notes.md#maestro-citations-checkable.
 
 INPUT: JSON list (or {"findings": [...]}) of objects with:
     layer     1-7
@@ -70,12 +71,10 @@ def norm(s):
 def check(f, root):
     """-> (bucket, detail). Pure: no output, so the tests can call it.
 
-    `status: "fixed"` inverts the test. Found 2026-09-23 by fixing three real
-    findings and re-scoring the pass that raised them: their quoted lines were
-    gone, so the scorer called them FABRICATED -- reporting remediated work as
-    invented. A quote that has DISAPPEARED from a file you claim to have fixed
-    is evidence the fix landed; a quote still sitting there is evidence it did
-    not. So a finding marked fixed is checked the other way round.
+    `status: "fixed"` inverts the test, or remediated work is reported as
+    invented (docs/design-notes.md#maestro-citations-checkable). A quote that
+    has DISAPPEARED from a file you claim to have fixed is evidence the fix
+    landed; a quote still sitting there is evidence it did not. So a finding marked fixed is checked the other way round.
     """
     missing = [k for k in REQUIRED if not str(f.get(k, "")).strip()]
     if missing:
@@ -97,10 +96,9 @@ def check(f, root):
     fixed = str(f.get("status", "")).lower() == "fixed"
     if fixed:
         # Preferred evidence: the line the FIX added. Required whenever the fix
-        # is an addition rather than a deletion -- F4 of pass 0002 was fixed by
-        # clearing a global at the top of the function, so its cited line (the
-        # return that failed to clear it) correctly still exists. Judging
-        # remediation by the absence of the old line marked that as UNFIXED.
+        # is an addition rather than a deletion: a fix that clears a global at
+        # the top of a function leaves the cited line correctly in place, and
+        # judging by the old line's absence would mark it UNFIXED.
         fq = norm(f.get("fix_quote", ""))
         if fq:
             if any(fq in norm(L) for L in lines):
@@ -202,10 +200,9 @@ def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="prodsec-maestro",
         description="Score a MAESTRO pass by checking whether its citations exist.")
-    # nargs="?" because --prompt takes no input. Found 2026-09-22 by installing
-    # the package and running the documented command: `prodsec-maestro --prompt`
-    # exited 2 with "the following arguments are required: findings". Third time
-    # packaging or documenting has found a defect that using it never did.
+    # nargs="?" because --prompt takes no input; a required positional made
+    # the documented `prodsec-maestro --prompt` exit 2.
+    # See docs/design-notes.md#run-the-docs.
     ap.add_argument("findings", nargs="?", help="findings JSON, or - for stdin")
     ap.add_argument("--root", default=".", help="repo root the citations are relative to")
     ap.add_argument("--prompt", action="store_true",
@@ -258,11 +255,9 @@ def main(argv=None):
         print("  %-11s %2d / %2d" % (b, len(buckets[b]), n))
 
     # The number that says whether the pass was HALLUCINATED, as opposed to
-    # merely stale. Found the first time this was run (2026-09-21): 9 of 10
-    # line numbers were wrong and 10 of 10 quotes were real, because the file
-    # had been edited an hour earlier. A checker that only compared line
-    # numbers would have reported 90% fabrication against a pass in which
-    # nothing was invented. The quote is the anchor; the line number is a hint.
+    # merely stale: line numbers drift with every edit, invented quotes do not
+    # appear by accident. The quote is the anchor; the line number is a hint.
+    # See docs/design-notes.md#maestro-citations-checkable.
     quotes_ok = len(buckets["CITED"]) + len(buckets["MISPLACED"])
     scored = quotes_ok + len(buckets["FABRICATED"])
     if scored:
@@ -271,7 +266,7 @@ def main(argv=None):
         print("  ^ the anti-hallucination number. Line numbers drift with every")
         print("    edit; invented text does not appear in a file by accident.")
 
-    # The tell from L15: real systems have empty layers. A pass with all seven
+    # The tell: real systems have empty layers. A pass with all seven
     # populated has generated rather than observed -- so say which are empty.
     empty = sorted(set(LAYERS) - seen_layers)
     print("-" * 68)

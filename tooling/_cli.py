@@ -7,6 +7,7 @@
 A gate that passes when it did not run is worse than no gate, because something
 downstream believes it. So every "could not look" path ends in 2, and a crash
 must never share an exit code with a finding.
+See docs/design-notes.md#exit-2-not-audited.
 """
 import functools
 import json
@@ -63,9 +64,8 @@ def read_json(path):
     except OSError as e:
         raise NotAudited("cannot read input: %s" % e)
     # Empty input almost always means the UPSTREAM command failed and the pipe
-    # swallowed it; "not JSON" would send you looking in the wrong place --
-    # observed 2026-09-21 when prodsec-fetch hit a 403 and the gate said
-    # "Expecting value: line 1 column 1".
+    # swallowed it; "not JSON" would send you looking in the wrong place.
+    # See docs/design-notes.md#empty-input-points-upstream.
     if not raw.strip():
         raise NotAudited(
             "no input.\n"

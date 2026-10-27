@@ -23,12 +23,9 @@ pip install '.[live]'            # LLM classifier via Claude Code's credentials
 pip install '.[live-api]'        # ...or via your own ANTHROPIC_API_KEY
 ```
 
-**Zero dependencies**, deliberately. The offline core is Python-stdlib only:
-every dependency is an ASI04 supply-chain surface in a tool whose job is to be
-trusted about supply chain, *and* a reason the gate stops installing on someone
-else's machine — and a security check that fails to install gets removed from
-the pipeline, not fixed. The one path that needs a model lives behind the
-`[live]` extra and is never on a required check.
+**Zero dependencies**, deliberately: the offline core is Python-stdlib only, and
+the one path that needs a model lives behind the `[live]` extra and is never on
+a required check ([why](docs/design-notes.md#zero-dependencies)).
 
 ## Commands
 
@@ -126,10 +123,9 @@ under a wrong scenario, and the scorer cannot tell.
 | `1` | **GATE** — full trifecta, or an irreversible action |
 | `2` | **ERROR / NOT AUDITED** — a configuration failure, **not a pass** |
 
-The `2` exists because `audit_allowlist.py` was once found exiting `0` when run
-against a directory containing no config at all: "no rules found" and "rules
-found and they are fine" were the same green light. **A gate that passes when it
-did not run is worse than no gate, because something downstream believes it.**
+**A gate that passes when it did not run is worse than no gate, because
+something downstream believes it** — so every command exits `2` when it could
+not look ([the story](docs/design-notes.md#exit-2-not-audited)).
 
 **Always `set -o pipefail`.** A shell pipeline reports only the *last* command's
 exit code, so an upstream fetch failure can be masked by a downstream success.
@@ -139,8 +135,8 @@ exit code, so an upstream fetch failure can be masked by a downstream success.
 - **`--live` defaults to the Agent SDK**, which is Claude Code as a library and
   therefore ships Bash, Read, Write and WebFetch. It is caged to zero tools and
   the cage is verified before each run — but that cage is load-bearing, and
-  L17's union-never-subtract ratchet does **not** cover it: the ratchet bounds
-  the verdict, not the host. `--backend api` has no tool surface to cage.
+  the union-never-subtract ratchet does **not** cover it: the ratchet bounds
+  the verdict, not the host ([why](docs/design-notes.md#sdk-lockdown)). `--backend api` has no tool surface to cage.
 - **Offline, it misses egress phrased in vocabulary the patterns don't know.**
   A tool described as "forwards the selected customer record to our partner
   endpoint" grades `SHIP` at 2 legs. `--live` closes this; the offline default
@@ -163,6 +159,11 @@ python3 tooling/maestro_score.py    --self-test       # 12/12
 set -o pipefail
 prodsec-fetch --i-will-execute-this --stdio python3 examples/demo_mcp_server.py | prodsec-gate -
 ```
+
+## Design notes
+
+Why it is built this way, and what went wrong on the way there:
+[docs/design-notes.md](docs/design-notes.md).
 
 ## License
 

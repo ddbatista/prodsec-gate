@@ -3,16 +3,17 @@
 Vet an MCP server's `tools/list` before it enters your agent catalogue.
 One command, one verdict, one exit code.
 
-Source: [`tooling/gate.py`](../tooling/gate.py) · Built in Capstone D1.
+Source: [`tooling/gate.py`](../tooling/gate.py) ·
+Why it is built this way: [design notes](design-notes.md).
 
 ## What it does
 
 ```
-tools/list dump              the untrusted input                (L04)
-  -> mcp_adapter.infer_signalled()
-       keyword floor                                            (L04)
-       + classifier signal, UNION ONLY, fail closed             (L17)
-  -> triage: legs, Rule of Two, irreversibility                 (L01, L03)
+tools/list dump              the untrusted input
+  -> mcp_adapter.build_manifest()
+       keyword floor
+       + classifier signal, UNION ONLY, fail closed
+  -> triage: legs, Rule of Two, irreversibility
   -> EXIT CODE                                                  (the interface)
 ```
 
@@ -88,7 +89,7 @@ and a control nobody can run is not a control.
 **The cage is the control, and it is not optional.** The Agent SDK ships an
 agent loop plus built-in Read, Write, Edit, Bash, Glob, Grep, WebSearch and
 WebFetch. The text being classified is written by the server operator — the
-party you are vetting. Handing that component a Bash tool is L15 D2 reversed.
+party you are vetting. See [design notes](design-notes.md#sdk-lockdown).
 
 Five independent settings, so a changed default cannot silently re-arm it:
 
@@ -131,12 +132,10 @@ becomes fail-closed, which becomes GATE — never a silent pass.
   classifier NOT run` plus the recall figure above, or, with `--live`, the
   backend, the classified/total count and the credential identity. It is also
   in the `--json` manifest under `instrument`, so a consumer can refuse a
-  verdict produced by the floor alone. Added 2026-09-21 (capstone D2): the
-  verdict had no way to tell you what it was looking with.
-  **Correction, same date:** an earlier revision of this section said `--live`
-  falls back to the keyword floor when unavailable. It does not — it prints
-  `ERROR: --live requested but unavailable` and exits 2. The doc described a
-  behaviour the code never had.
+  verdict produced by the floor alone
+  ([why](design-notes.md#verdict-carries-instrument)). `--live` never falls
+  back to the floor: unavailable, it prints `ERROR: --live requested but
+  unavailable` and exits 2.
 
 ## Related
 

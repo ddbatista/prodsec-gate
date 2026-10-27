@@ -3,7 +3,8 @@
 Capture a live MCP server's `tools/list` so the gate has something real to vet.
 Stdio and HTTP. Stdlib only.
 
-Source: [`tooling/mcp_fetch.py`](../tooling/mcp_fetch.py) · Built in Capstone D1.
+Source: [`tooling/mcp_fetch.py`](../tooling/mcp_fetch.py) ·
+Why: [design notes](design-notes.md#fetch-executes-code).
 
 ## The thing to understand first
 

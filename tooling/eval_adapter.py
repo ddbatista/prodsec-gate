@@ -2,13 +2,13 @@
 """
 eval_adapter.py — does the classifier signal actually improve the adapter?
 
-L16's discipline applied to a detector: report RATES, not "it works better".
-Per-leg recall and precision against a hand-labelled corpus, baseline
-(keyword only) vs baseline + classifier signal.
+Report RATES, not "it works better": per-leg recall and precision against a
+hand-labelled corpus, baseline (keyword only) vs baseline + classifier signal.
 
 Recall is the number that matters here. A missed leg is a tool that grades
-SHIP when it should GATE -- the X3 failure. A false leg is noise: it costs a
-human a second look, which is the trade the ratchet deliberately makes.
+SHIP when it should GATE (docs/design-notes.md#keyword-floor-misses-egress).
+A false leg is noise: it costs a human a second look, which is the trade the
+ratchet deliberately makes.
 
 THE STAND-IN IS DISCLOSED, because the alternative is a rigged benchmark.
 --rigged (the default) uses `semantic_stub`, a hand-written function that
@@ -17,6 +17,7 @@ eval runs offline, free and deterministically, and it flatters the classifier
 by construction: it was written by someone who had already read the corpus.
 Treat its numbers as an upper bound on the design, never as a measurement of a
 model. --live is the real thing, and MAESTRO layer 1 stays EMPTY until you run it.
+See docs/design-notes.md#rigged-eval-disclosed.
 """
 import argparse
 import importlib.util

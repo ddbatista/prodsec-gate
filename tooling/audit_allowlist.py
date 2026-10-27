@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-audit_allowlist.py — L12: grade the allowlist you never sat down and wrote.
+audit_allowlist.py — grade the allowlist you never sat down and wrote.
 
 An `allow` list built by clicking "Yes, don't ask again" is a POLICY DERIVED FROM
 BEHAVIOUR. Nobody reviewed it; it accreted one convenience decision at a time,
@@ -20,7 +20,8 @@ The second is the dangerous one, and it is the one a specificity-based reviewer
 (human or script) waves through. So the classification here is by WHAT CAN RUN,
 not by pattern shape.
 
-TWO HEURISTIC FAILURES FOUND WHILE WRITING THIS, both left visible in the code:
+TWO HEURISTIC FAILURES FOUND WHILE WRITING THIS, both left visible in the code
+(docs/design-notes.md#allowlist-blast-radius):
   * v1 bucketed by "does the spec contain a wildcard". It filed `Bash(python3 -)`
     as narrow. That is the exact mistake the tool exists to catch, made by the
     tool. Fixed by matching stdin-program FORMS, not wildcards.
@@ -169,7 +170,7 @@ SELF_TEST = [
     ("WebSearch",                              "WHOLE-TOOL"),  # unscoped, but not RCE
 ]
 
-# L12 D2 corpus — floor membership, kept separate so the grade tests stay clean.
+# Read-only floor membership, kept separate so the grade tests stay clean.
 FLOOR_TEST = [
     ("echo \"exit=$?\"",              "YES"),
     ("grep -n pattern file.txt",       "YES"),
@@ -211,7 +212,7 @@ def self_test():
 
 
 # --------------------------------------------------------------------------
-# L12 D2 — THE FLOOR YOU DIDN'T HAVE TO WRITE
+# THE FLOOR YOU DIDN'T HAVE TO WRITE
 #
 # Claude Code "recognizes a built-in set of Bash commands as read-only and runs
 # them without a permission prompt IN EVERY MODE. The set is NOT CONFIGURABLE;
@@ -382,11 +383,10 @@ def main():
         print("  scopes absent: %s" % ", ".join(absent))
 
     if not rows:
-        # Found 2026-09-20 by running this from /tmp during the portability
-        # work: it printed this line and exited 0. "No rules found" and "rules
-        # found and they are fine" were the same green light, so a renamed
-        # settings file, a wrong --project, or a CI runner without the config
-        # would pass this check forever. NOTHING AUDITED IS NOT A PASS.
+        # "No rules found" and "rules found and they are fine" must not be the
+        # same green light, or a renamed settings file, a wrong --project or a
+        # CI runner without the config passes forever. NOTHING AUDITED IS NOT
+        # A PASS. See docs/design-notes.md#exit-2-not-audited.
         any_config = any(load(path) is not None for _, path in SCOPES)
         if not any_config:
             raise _cli.NotAudited(

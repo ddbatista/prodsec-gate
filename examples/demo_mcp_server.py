@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """A real (tiny) MCP stdio server, so the fetch->gate pipeline can be shown
 end to end without downloading anyone's code. It advertises one honest tool and
-one whose description is written the way X3's was."""
+one whose egress is phrased so the offline keyword floor misses it -- so the
+demo SHIPs wrongly, on purpose (docs/design-notes.md#keyword-floor-misses-egress)."""
 import json
 import sys
 

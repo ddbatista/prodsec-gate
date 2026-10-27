@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-policy_guard_hook.py — L10 Day 2: one choke point instead of fourteen wrappers.
+policy_guard_hook.py — one choke point instead of fourteen wrappers.
 
-Day 1 counted the surfaces that can change bytes in .claude/settings.json and
-found L08's prescription (`deny: Write/Edit(...)`) covers 2 of 14. The answer is
-not rule number fifteen. It is to stop naming tools and start standing where the
-calls converge: a PreToolUse hook, which sees EVERY tool call before it runs.
+falsify_path_guard.py counts the surfaces that can change bytes in
+.claude/settings.json; a `deny: Write/Edit(...)` prescription covers 2 of 14.
+The answer is not rule number fifteen. It is to stop naming tools and start
+standing where the calls converge: a PreToolUse hook, which sees EVERY tool call
+before it runs. It can only tighten: see docs/design-notes.md#hook-one-way-ratchet.
 
   stdin  <- {"hook_event_name":"PreToolUse","tool_name":"Bash",
              "tool_input":{"command":"echo x >> .claude/settings.json"}, ...}
@@ -18,14 +19,14 @@ Verified against the Claude Code hooks reference and guide, 2026-08-16:
   * exit 0 + JSON decision `allow|deny|ask`, or exit 2 + stderr, blocks a call.
   * ANY OTHER EXIT CODE IS A NON-BLOCKING ERROR AND THE TOOL CALL PROCEEDS.
     A crashing guard is an open guard, so every path here is wrapped and the
-    except branch DENIES. See fail_closed().
+    except branch DENIES. See fail_closed() and docs/design-notes.md#fail-closed.
   * The matcher is itself an allowlist of tool names. `"*"` matches all tools;
     `Bash|Write|Edit|NotebookEdit` does not cover an MCP write tool. See
     --self-test, section GAPS.
 
 WHAT THIS DOES NOT DO — read before trusting it:
   * For Bash it matches on the SPELLING of the command string. That is the
-    allowlist-as-parser shape from L09, seen from the deny side: the shell can
+    allowlist-as-parser shape, seen from the deny side: the shell can
     build a path the guard never sees. That is why anything that both conceals
     a target and writes something returns "ask" (a human) rather than "allow".
   * Consequently it over-blocks: `cat .claude/settings.json` is a read and is
@@ -57,7 +58,8 @@ DEFAULT_PROTECTED = [
 # Fields under tool_input that name a file, across the tools that write one.
 PATH_FIELDS = ("file_path", "notebook_path", "path", "filePath", "target_file")
 
-# Shell constructs that WRITE. Deliberately the Day 1 vocabulary, plus editors.
+# Shell constructs that WRITE. Deliberately falsify_path_guard.py's vocabulary,
+# plus editors.
 WRITE_HINTS = [
     r">>", r"(?<![0-9<>])>(?!&)", r"\btee\b", r"\bsed\b\s+-i", r"\bcp\b", r"\bmv\b",
     r"\btruncate\b", r"\bdd\b\s+.*\bof=", r"\bperl\b\s+-\w*i", r"\bpython3?\b\s+-c",
@@ -246,9 +248,9 @@ def self_test(protected):
     print("\n" + "=" * 76)
     print(" %d/%d asserted cases pass. %d known gaps disclosed above." %
           (total - fails, total, len(KNOWN_GAPS)))
-    print(" Offline PASS is not enforcement. The verdict is the Day 1 run-book,")
-    print(" re-run in a fresh session with this hook registered. If the recorded")
-    print(" outcomes do not CHANGE, the hook is not in the path.")
+    print(" Offline PASS is not enforcement. The verdict is falsify_path_guard.py's")
+    print(" run-book, re-run in a fresh session with this hook registered. If the")
+    print(" recorded outcomes do not CHANGE, the hook is not in the path.")
     print("=" * 76)
     return 1 if fails else 0
 

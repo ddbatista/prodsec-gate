@@ -5,7 +5,7 @@ are detectable, then **score the result by checking its citations**.
 
 Source: [`tooling/maestro_score.py`](../tooling/maestro_score.py) ·
 Skill: [`.claude/skills/maestro-pass/SKILL.md`](../.claude/skills/maestro-pass/SKILL.md) ·
-Built in L18.
+Why: [design notes](design-notes.md#maestro-citations-checkable).
 
 ## The seven layers
 
@@ -99,7 +99,7 @@ place. See *What it cannot decide* below.
 ## Reading the output
 
 Three real lines, from three different runs during development (the cited
-files belonged to the training workspace, not this repo) — no invented sample
+files were from the course, not this repo) — no invented sample
 output, for the same reason the prompt demands a verbatim quote:
 
 ```
@@ -134,11 +134,9 @@ anti-hallucination measure, and it is not the same as the bucket counts:
   quotes that exist in the cited file:  10 / 10
 ```
 
-That is a real run (2026-09-21, the L18 pass over `tooling/`). One in ten looks
-catastrophic; nothing was invented. Every line number was stale because the file
-had been edited an hour earlier, and **an edit moves every line below it**. A
-checker comparing only line numbers would have reported 90% fabrication and you
-would have binned ten real findings.
+That is a real run. One in ten looks catastrophic; nothing was invented: every
+line number was stale because **an edit moves every line below it**
+([the story](design-notes.md#maestro-citations-checkable)).
 
 > **The quote is the anchor; the line number is a hint.**
 

@@ -9,7 +9,7 @@ description = "Agentic-security triage and gating tools (lethal trifecta, Rule o
 requires-python = ">=3.9"
 license = {text = "MIT"}
 readme = "README.md"
-# NO dependencies, on purpose. See prodsec_gate/__init__.py.
+# NO dependencies, on purpose. See docs/design-notes.md#zero-dependencies.
 dependencies = []
 
 [project.optional-dependencies]
