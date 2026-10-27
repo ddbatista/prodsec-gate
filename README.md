@@ -37,7 +37,7 @@ the pipeline, not fixed. The one path that needs a model lives behind the
 | `prodsec-fetch` | Capture a live MCP server's `tools/list` | [docs](docs/prodsec-fetch.md) |
 | `prodsec-gate` | Vet that dump → verdict → exit code | [docs](docs/prodsec-gate.md) |
 | `prodsec-triage` | Grade a hand-written agent manifest | [tooling](tooling/README.md) |
-| `prodsec-adapter` | Dump → manifest, without the verdict | [tooling](tooling/README.md) |
+| `prodsec-adapter` | **Deprecated** alias of `prodsec-gate --json` (always exits 0 or 2) | [tooling](tooling/README.md) |
 | `prodsec-audit` | Audit Claude Code / Codex / Cursor / your own agent | [tooling](tooling/README.md) |
 | `prodsec-allowlist` | Grade a Claude Code allow-list by blast radius | [tooling](tooling/README.md) |
 | `prodsec-maestro` | Print the MAESTRO pass prompt; score a pass's citations | [docs](docs/maestro-pass.md) |
@@ -71,11 +71,13 @@ records but never uses an egress keyword, so it grades **SHIP when it should
 GATE**. Add `--live` to have an LLM classify the descriptions as well; see
 [docs/prodsec-gate.md](docs/prodsec-gate.md).
 
-**Grade an MCP dump you already have:**
+**Grade an MCP dump you already have.** If you commit dumps, name them
+`<server>.tools.json` so the [pre-commit hook](docs/packaging-and-ci.md) picks
+them up:
 
 ```sh
 prodsec-gate tooling/mcp-dump.json            # → GATE (full trifecta), exit 1
-prodsec-gate tooling/mcp-dump.json --json     # show the inferred manifest instead
+prodsec-gate tooling/mcp-dump.json --json     # same verdict and exit code, as JSON with the manifest
 ```
 
 **Grade a hand-written agent manifest.** The schema is in
@@ -151,6 +153,7 @@ exit code, so an upstream fetch failure can be masked by a downstream success.
 ## Verify it yourself
 
 ```sh
+python3 -m unittest discover                          # stdlib only, no dev dependencies
 python3 tooling/audit_agent_config.py --self-test     # 12/12
 python3 tooling/audit_allowlist.py  --self-test       # 15/15, then 11/11
 python3 tooling/policy_guard_hook.py --self-test      # 22/22

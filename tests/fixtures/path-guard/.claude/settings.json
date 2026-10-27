@@ -1,0 +1,1 @@
+{"permissions": {"deny": ["Edit(.claude/settings*.json)", "Write(.claude/settings.json)"]}}

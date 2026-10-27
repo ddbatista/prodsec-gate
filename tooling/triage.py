@@ -10,10 +10,11 @@ This is the automated successor to the manual Agent Security-Review Checklist
 (reference/agent-security-review-checklist.html). v0.1.
 
 Usage:
-    python3 triage.py [manifest.json]
+    python3 triage.py <manifest.json | ->
     python3 triage.py sample-agent.json
 
-Exit code: 0 = SHIP, 1 = GATE/violation (so it can fail a CI pipeline).
+Exit code: 0 = SHIP, 1 = GATE/violation (so it can fail a CI pipeline),
+2 = not audited (bad input, no tools, or a crash) -- never a pass.
 
 Frameworks:
   - Lethal Trifecta .... Willison (2025)
@@ -21,8 +22,13 @@ Frameworks:
   - Four-layer model ... Anthropic, "Trustworthy Agents in Practice" (2026)
   - OWASP Agentic Top 10 (ASI) ... OWASP GenAI Security Project (2026)
 """
-import json
+import argparse
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import _cli                      # noqa: E402
 
 # --- The capability vocabulary a manifest may use, mapped to trifecta legs ----
 # A tool declares "capabilities". We fold them into the three Rule-of-Two legs.
@@ -42,13 +48,6 @@ OWASP = {
     "ASI05": "Unexpected Code Execution",
     "ASI06": "Memory & Context Poisoning",
 }
-
-
-def load(path):
-    if path == "-":               # read a piped manifest from stdin
-        return json.load(sys.stdin)
-    with open(path) as f:
-        return json.load(f)
 
 
 def tag_legs(tools):
@@ -184,15 +183,23 @@ def _wrap(s, width):
     return out
 
 
-def main():
-    path = sys.argv[1] if len(sys.argv) > 1 else "sample-agent.json"
-    try:
-        m = load(path)
-    except FileNotFoundError:
-        print("manifest not found: %s" % path); sys.exit(2)
+@_cli.entrypoint
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        prog="prodsec-triage",
+        description="Grade an agent manifest against the Rule of Two.")
+    ap.add_argument("manifest", help="manifest JSON, or - for stdin")
+    path = ap.parse_args(argv).manifest
+    m = _cli.read_json(path)
+
+    # NOTHING AUDITED is not a pass: an empty manifest would otherwise SHIP.
+    if not m.get("tools"):
+        raise _cli.NotAudited(
+            "the manifest declares no tools. Nothing was audited, so\n"
+            "       this is a configuration failure, not a clean result.")
 
     # light validation — catch typos in capability names
-    for t in m.get("tools", []):
+    for t in m["tools"]:
         bad = set(t.get("capabilities", [])) - VALID_CAPS
         if bad:
             print("WARN: tool '%s' has unknown capabilities: %s"
@@ -200,8 +207,8 @@ def main():
 
     a = assess(m)
     report(m, a)
-    sys.exit(1 if a["verdict"] in ("GATE", "REVIEW") else 0)
+    return _cli.GATE if a["verdict"] in ("GATE", "REVIEW") else _cli.SHIP
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

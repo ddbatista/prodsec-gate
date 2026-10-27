@@ -42,7 +42,8 @@ MODE INTERACTION — the part that matters if you just pinned your mode:
 
 USAGE
   python3 audit_allowlist.py [--project DIR] [--self-test]
-Exit 0 = no unbounded rules, 1 = at least one.
+Exit 0 = no unbounded rules, 1 = at least one, 2 = not audited (no settings in
+any scope, an unreadable --project, or a settings file that cannot be parsed).
 """
 import argparse
 import json
@@ -50,6 +51,10 @@ import os
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import _cli                      # noqa: E402
 
 HOME = Path.home()
 SCOPES = [
@@ -86,10 +91,19 @@ UNBOUNDED_FORMS = [
 
 
 def load(path):
+    """The settings at path, or None if the file does not exist.
+
+    A file that exists but cannot be read or parsed is NOT absent: treating it
+    as absent audits the other scopes and reports on rules it never saw.
+    """
     try:
         return json.loads(path.read_text())
-    except (FileNotFoundError, json.JSONDecodeError, PermissionError):
+    except FileNotFoundError:
         return None
+    except json.JSONDecodeError as e:
+        raise _cli.NotAudited("malformed JSON in %s: %s" % (path, e))
+    except OSError as e:
+        raise _cli.NotAudited("cannot read %s: %s" % (path, e))
 
 
 def parse(rule):
@@ -331,6 +345,7 @@ def propose(rows):
     return 0
 
 
+@_cli.entrypoint
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--project", default=".")
@@ -340,7 +355,7 @@ def main():
     args = ap.parse_args()
     if args.self_test:
         return self_test()
-    os.chdir(args.project)
+    _cli.chdir_project(args.project)
     root = Path.cwd()
 
     rows = []
@@ -374,12 +389,12 @@ def main():
         # would pass this check forever. NOTHING AUDITED IS NOT A PASS.
         any_config = any(load(path) is not None for _, path in SCOPES)
         if not any_config:
-            print("\n  NOT AUDITED: no Claude Code settings file exists in any")
-            print("  scope under %s" % root)
-            print("  This is a configuration failure, not a clean result. If you")
-            print("  meant to audit a project, check --project; if this runner")
-            print("  genuinely has no config, do not gate on this check.")
-            return 2
+            raise _cli.NotAudited(
+                "NOT AUDITED: no Claude Code settings file exists in any\n"
+                "       scope under %s\n"
+                "       This is a configuration failure, not a clean result. If you\n"
+                "       meant to audit a project, check --project; if this runner\n"
+                "       genuinely has no config, do not gate on this check." % root)
         print("\n  No allow rules in any scope. Nothing pre-approved.")
         print("  (A settings file exists and contains no allow rules -- that is")
         print("   a real, audited result, unlike the case above.)")

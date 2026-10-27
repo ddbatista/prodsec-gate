@@ -28,7 +28,10 @@ Primary sources (verified on the date beside each):
                GHSA-82wg-qcm4-fp2w / CVE-2026-22708 (allowlist bypass)
 
 USAGE:  python3 audit_agent_config.py [--project DIR] [--agent TARGET]
-Exit 0 = no high-severity findings, 1 = at least one HIGH.
+Exit 0 = no high-severity findings, 1 = at least one HIGH,
+2 = not audited (unreadable --project or a config file that exists but
+    cannot be parsed -- including a Codex config.toml on Python < 3.11, which
+    has no TOML parser).
 """
 import argparse
 import ast
@@ -42,6 +45,10 @@ try:
     import tomllib                     # stdlib on 3.11+; Codex config is TOML
 except ModuleNotFoundError:            # pragma: no cover
     tomllib = None
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import _cli                      # noqa: E402
 
 HOME = Path.home()
 
@@ -94,12 +101,16 @@ def load_json(path):
         return None, "malformed JSON: %s" % e
     except PermissionError:
         return None, "unreadable (permission denied)"
+    except OSError as e:
+        return None, "unreadable (%s)" % e
 
 
 def load_toml(path):
     """Return (parsed_dict, error_string). Never raises."""
     if tomllib is None:
-        return None, "needs Python 3.11+ (tomllib)"
+        # Only a problem if there is a file we cannot read; an absent config
+        # is audited the same on every Python.
+        return None, ("needs Python 3.11+ (tomllib)" if Path(path).exists() else None)
     try:
         with open(path, "rb") as fh:
             return tomllib.load(fh), None
@@ -109,6 +120,8 @@ def load_toml(path):
         return None, "malformed TOML: %s" % e
     except PermissionError:
         return None, "unreadable (permission denied)"
+    except OSError as e:
+        return None, "unreadable (%s)" % e
 
 
 def rules(cfg, kind):
@@ -192,8 +205,8 @@ def command_rules(rule_list, needles):
     return out
 
 
-def inventory(scopes, loader):
-    """Print a scope table and return {name: cfg}."""
+def inventory(r, scopes, loader):
+    """Print a scope table and return {name: cfg}; unreadable scopes go on r."""
     print("\n  scope     file                                   status")
     print("  " + "-" * 70)
     configs = {}
@@ -201,6 +214,8 @@ def inventory(scopes, loader):
         name, path = entry[0], entry[1]
         cfg, err = loader(path)
         configs[name] = cfg
+        if err:
+            r.unread[str(path)] = err
         status = err or ("found" if cfg is not None else "absent")
         print("  %-9s %-38s %s" % (name, str(path)[-38:], status))
     return configs
@@ -209,6 +224,10 @@ def inventory(scopes, loader):
 class Report:
     def __init__(self):
         self.findings = []
+        # Scopes that exist but could not be read. Auditing around them would
+        # grade rules nobody saw, so any entry here makes the run NOT AUDITED.
+        # Keyed by path: some scopes are read by more than one target.
+        self.unread = {}
 
     def add(self, severity, layer, title, detail):
         self.findings.append((severity, layer, title, detail))
@@ -237,7 +256,7 @@ class Report:
 
 def audit_claude(r):
     print("\n### CLAUDE CODE ###")
-    configs = inventory(SCOPES, load_json)
+    configs = inventory(r, SCOPES, load_json)
     print("\n  Reminder: permission rules MERGE across scopes; deny beats allow.")
 
     merged_allow, merged_deny, merged_ask = [], [], []
@@ -476,8 +495,10 @@ def codex_effective(configs, key, default=None):
 
 def audit_codex(r):
     print("\n### CODEX CLI ###")
-    configs = inventory(CODEX_SCOPES, load_toml)
+    configs = inventory(r, CODEX_SCOPES, load_toml)
     reqs, req_err = load_toml(CODEX_REQUIREMENTS)
+    if req_err:
+        r.unread[str(CODEX_REQUIREMENTS)] = req_err
     print("  %-9s %-38s %s" % ("managed", str(CODEX_REQUIREMENTS)[-38:],
                                req_err or ("found" if reqs is not None else "absent")))
     print("\n  Reminder: sandbox_mode = what it CAN do; approval_policy = when it ASKS.")
@@ -599,7 +620,7 @@ def audit_codex(r):
 
 def audit_cursor(r):
     print("\n### CURSOR ###")
-    configs = inventory(CURSOR_SCOPES, load_json)
+    configs = inventory(r, CURSOR_SCOPES, load_json)
     print("\n  Reminder: allowlist model only — Cursor exposes no tool DENY list.")
 
     merged = {"mcpAllowlist": [], "terminalAllowlist": []}
@@ -894,7 +915,9 @@ def audit_env_surface(r):
         print("        are clean. Audit the environment the agent actually has.")
     declared_deny, declared_mask, scopes_seen = set(), set(), []
     for label, path, _ in SCOPES:
-        cfg, _err = load_json(path)
+        cfg, err = load_json(path)
+        if err:
+            r.unread[str(path)] = err
         if not cfg:
             continue
         creds = ((cfg.get("sandbox") or {}).get("credentials") or {})
@@ -1027,6 +1050,7 @@ def self_test():
     return bad
 
 
+@_cli.entrypoint
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--project", default=".", help="project dir containing .claude/ etc.")
@@ -1039,7 +1063,7 @@ def main():
     args = ap.parse_args()
     if args.self_test:
         return 1 if self_test() else 0
-    os.chdir(args.project)
+    _cli.chdir_project(args.project)
 
     print("=" * 74)
     print(" CODING-AGENT CONFIG AUDIT · Rule of Two applied to your own workflow")
@@ -1071,6 +1095,11 @@ def main():
     print(" hook is a one-way ratchet. Hold both -- but not because the hook's mode")
     print(" durability is unknown; it isn't. Deny rules earn their place by beating")
     print(" a hook ALLOW.")
+    if r.unread:
+        raise _cli.NotAudited(
+            "%d config file(s) exist but could not be read, so the findings\n"
+            "       above describe rules this audit never saw:\n%s"
+            % (len(r.unread), "\n".join("         %s: %s" % pe for pe in r.unread.items())))
     return 1 if highs else 0
 
 

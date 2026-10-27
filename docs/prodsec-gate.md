@@ -21,7 +21,7 @@ tools/list dump              the untrusted input                (L04)
 ```sh
 prodsec-gate dump.json                 # from a file
 prodsec-gate -                         # from stdin
-prodsec-gate dump.json --json          # emit the derived manifest, don't grade
+prodsec-gate dump.json --json          # the manifest and verdict as JSON; same exit code
 prodsec-gate dump.json --live          # add the LLM signal layer
 prodsec-gate dump.json --live --backend api   # the other backend
 ```

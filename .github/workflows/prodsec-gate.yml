@@ -19,16 +19,25 @@ permissions:
 jobs:
   offline:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every version requires-python claims, not just the one we develop on.
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       # No `pip install -r requirements.txt` because there isn't one.
       # The offline core is stdlib-only by design -- see prodsec_gate/__init__.py.
       - name: Install (zero dependencies)
         run: pip install .
+
+      # Stdlib unittest, so the test suite adds no dependencies either.
+      - name: Test suite
+        run: python -m unittest discover -v
 
       - name: Self-tests must pass before any verdict is believed
         run: |

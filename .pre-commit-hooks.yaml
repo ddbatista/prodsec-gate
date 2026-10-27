@@ -11,5 +11,8 @@
     audited, because that is a configuration failure rather than a pass.
   entry: prodsec-gate
   language: python
-  files: '(^|/)[^/]*dump[^/]*\.json$|(^|/)\.mcp\.json$'
+  # Committed tools/list dumps: name them <server>.tools.json. *dump*.json is
+  # kept for existing layouts. NOT .mcp.json: that is a server config, not a
+  # dump, and grading it fails every commit that touches it.
+  files: '(^|/)[^/]+\.tools\.json$|(^|/)[^/]*dump[^/]*\.json$'
   pass_filenames: true

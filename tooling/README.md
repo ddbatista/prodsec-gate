@@ -24,12 +24,18 @@ python3 triage.py delete-db-agent.json      # 2 legs but irreversible → GATE
 python3 triage.py delete-db-agent-fixed.json # hardened → SHIP
 
 # Audit a real MCP server's advertised tools (Lesson 04):
-python3 mcp_adapter.py mcp-dump.json                       # inferred manifest + INFER notes
-python3 mcp_adapter.py mcp-dump.json | python3 triage.py - # full audit (reads stdin via "-")
+python3 gate.py mcp-dump.json                    # verdict + exit code
+python3 gate.py mcp-dump.json --json             # inferred manifest (notes inline), same exit code
+python3 gate.py mcp-dump.json --json | python3 triage.py -   # grade the manifest yourself
 ```
 
+`mcp_adapter.py` / `prodsec-adapter` still work but are a **deprecated** alias of
+`gate.py --json`: same manifest, a warning on stderr, and always exit `0`
+(manifest produced) or `2` (not), never `1`.
+
 No dependencies — Python 3 stdlib only. Exit code is `1` for GATE/REVIEW so it
-can fail a CI pipeline; `0` for SHIP.
+can fail a CI pipeline; `0` for SHIP; `2` when nothing was audited (bad input,
+no tools, or a crash) -- never a pass.
 
 `mcp_adapter.py` infers trifecta capabilities from a raw MCP `tools/list` dump
 (name + description lead; annotations are treated as **untrusted** and a
@@ -76,7 +82,7 @@ JSON-RPC handshake for you. Two cases depending on how the server ships:
 **Local stdio server** (Inspector launches it as a child process):
 ```sh
 npx @modelcontextprotocol/inspector --cli npx <server-pkg> --method tools/list > dump.json
-python3 mcp_adapter.py dump.json | python3 triage.py -
+python3 gate.py dump.json
 ```
 - ⚠️ This **executes the server's code** to inspect it → supply-chain risk (ASI04).
   Run untrusted servers in a container/VM, not on your workstation.
@@ -91,7 +97,7 @@ npx @modelcontextprotocol/inspector   # web UI: Transport=HTTP, set URL, auth, o
   credential into a live tenant. Least-privilege the API scopes; a read-only
   audit client needs no write access.
 
-Either way: export the JSON, then feed it to `mcp_adapter.py`.
+Either way: export the JSON, then feed it to `gate.py` (or `prodsec-gate`).
 
 ## Roadmap (where this is going)
 - Ingest real configs (MCP server tool lists, framework agent definitions) instead of hand-written manifests.

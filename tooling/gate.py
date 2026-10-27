@@ -39,16 +39,11 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+import _cli                      # noqa: E402
 import mcp_adapter as A          # noqa: E402
 import triage as T               # noqa: E402
 
-SHIP, GATE, ERROR = 0, 1, 2
-
-
-# The keyword floor's measured recall on the 12-tool labelled corpus
-# (tooling/corpus.json, eval_adapter.py). Printed, not merely documented --
-# see the note in print_instrument().
-FLOOR_RECALL = "62.5%"
+SHIP, GATE, ERROR = _cli.SHIP, _cli.GATE, _cli.ERROR
 
 
 def print_instrument(n_tools, live, backend_name, n_failed):
@@ -65,7 +60,7 @@ def print_instrument(n_tools, live, backend_name, n_failed):
     print(" INSTRUMENT")
     if not live:
         print("  keyword floor only  ·  classifier NOT run  ·  --live adds it")
-        print("  floor recall on the 12-tool corpus: %s" % FLOOR_RECALL)
+        print("  floor recall on the 12-tool corpus: %s" % A.FLOOR_RECALL)
         print("  so SHIP here means 'no keyword matched', NOT 'no capability'.")
     else:
         print("  keyword floor UNION classifier (%s)" % backend_name)
@@ -80,43 +75,10 @@ def print_instrument(n_tools, live, backend_name, n_failed):
     print("  reads DECLARATIONS (name/description), never behaviour.")
 
 
-def build_manifest(dump, backend, server_name, progress=False):
-    tools, failed_closed = [], []
-    raw = _tools(dump)
-    for i, t in enumerate(raw, 1):
-        # The agent-sdk backend spawns a Claude Code CLI subprocess per tool,
-        # ~3.5s each, serially. Three tools is 11 seconds of silence; a 40-tool
-        # server is two minutes of it. Found 2026-09-21 when a run that had not
-        # hung was reasonably assumed to have hung. A gate that looks dead gets
-        # killed, and a killed gate teaches people to stop running it.
-        if progress:
-            print("  [%d/%d] classifying %s ..." % (i, len(raw), t.get("name", "?")),
-                  file=sys.stderr, flush=True)
-        caps, reversible, notes, ok = A.infer_signalled(t, backend)
-        if not ok:
-            failed_closed.append(t.get("name", "?"))
-        tools.append({
-            "name": t.get("name", "?"),
-            "description": (t.get("description") or "")[:200],
-            "capabilities": sorted(c for c in caps if c in T.VALID_CAPS),
-            "reversible": True if reversible is None else reversible,
-            "notes": notes,
-        })
-    return {"agent": server_name, "human_in_loop": False, "tools": tools}, failed_closed
-
-
-def _tools(dump):
-    if isinstance(dump, list):
-        return dump
-    for k in ("tools",):
-        if k in dump:
-            return dump[k]
-    if "result" in dump and "tools" in dump["result"]:
-        return dump["result"]["tools"]
-    raise ValueError("could not find a tools list in input")
-
-
-def main(argv=None):
+@_cli.entrypoint
+def main(argv=None, backend=None):
+    """backend: a classifier to use instead of building one from --live.
+    In-process only (tests drive the live path with it); there is no flag."""
     ap = argparse.ArgumentParser(
         prog="prodsec-gate",
         description="Vet an MCP server's tools/list before it enters your catalogue.")
@@ -133,33 +95,15 @@ def main(argv=None):
                          "attacker-authored text is sent. api: Anthropic SDK, "
                          "one message and no tool surface at all, but needs its "
                          "own key. See docs/prodsec-gate.md for the trade.")
-    ap.add_argument("--json", action="store_true", help="emit the manifest and exit")
+    ap.add_argument("--json", action="store_true",
+                    help="emit the manifest and verdict as JSON; the exit code is "
+                         "still the verdict's")
     a = ap.parse_args(argv)
 
-    try:
-        raw = sys.stdin.read() if a.dump == "-" else open(a.dump).read()
-    except OSError as e:
-        print("ERROR: cannot read input: %s" % e, file=sys.stderr)
-        return ERROR
-    # Empty input almost always means the UPSTREAM command failed and the pipe
-    # swallowed it. Reporting "not JSON" here sends you looking in the wrong
-    # place -- observed 2026-09-21 when prodsec-fetch hit a 403 and this said
-    # "Expecting value: line 1 column 1".
-    if not raw.strip():
-        print("ERROR: no input.\n"
-              "       If you piped this, the upstream command produced nothing --\n"
-              "       read ITS error, not this one. Shells return only the LAST\n"
-              "       exit code in a pipeline, so add:  set -o pipefail",
-              file=sys.stderr)
-        return ERROR
-    try:
-        dump = json.loads(raw)
-    except json.JSONDecodeError as e:
-        print("ERROR: input is not JSON: %s" % e, file=sys.stderr)
-        return ERROR
+    dump = _cli.read_json(a.dump)
 
-    backend = None
-    if a.live:
+    classifier = "injected" if backend else a.backend
+    if backend is None and a.live:
         try:
             if a.backend == "agent-sdk":
                 import agent_sdk_backend as asb
@@ -190,55 +134,65 @@ def main(argv=None):
             return ERROR                              # fail closed, never silently offline
 
     try:
-        manifest, failed_closed = build_manifest(
+        manifest = A.build_manifest(
             dump, backend, a.name or ("<stdin>" if a.dump == "-"
                                       else os.path.basename(a.dump)),
-            progress=bool(backend))
+            classifier=classifier, progress=bool(backend))
     except ValueError as e:
-        print("ERROR: %s" % e, file=sys.stderr)
-        return ERROR
+        raise _cli.NotAudited(str(e))
 
     # NOTHING AUDITED is not a pass. See the module docstring.
     if not manifest["tools"]:
-        print("ERROR: the dump contains no tools. Nothing was audited, so this\n"
-              "       is a configuration failure, not a clean result.", file=sys.stderr)
-        return ERROR
-
-    if a.json:
-        manifest["instrument"] = {
-            "classifier": a.backend if backend else None,
-            "floor_recall_on_corpus": FLOOR_RECALL,
-            "failed_closed": failed_closed,
-            "basis": "declarations",
-        }
-        print(json.dumps(manifest, indent=2))
-        return SHIP
+        raise _cli.NotAudited(
+            "the dump contains no tools. Nothing was audited, so this\n"
+            "       is a configuration failure, not a clean result.")
 
     # Reuse triage's own assessment -- one verdict function, not two.
-    a_ = T.assess(manifest)
-    T.report(manifest, a_)
-    print_instrument(len(manifest["tools"]), bool(backend), a.backend,
+    assessment = T.assess(manifest)
+    failed_closed = manifest["instrument"]["failed_closed"]
+    rc = verdict_code(assessment, failed_closed, len(manifest["tools"]))
+
+    if a.json:
+        # Machine-readable output must not turn the gate off: same verdict,
+        # same exit code as the report.
+        manifest["verdict"] = ("ERROR" if rc == ERROR else
+                               "GATE" if failed_closed else assessment["verdict"])
+        print(json.dumps(manifest, indent=2))
+        if rc == ERROR:
+            # stdout is a manifest; the failure must not live only inside it.
+            print("ERROR: every tool failed closed, so the classifier never ran.\n"
+                  "       This is a configuration failure, not a verdict.",
+                  file=sys.stderr)
+        return rc
+
+    T.report(manifest, assessment)
+    print_instrument(len(manifest["tools"]), bool(backend), classifier,
                      len(failed_closed))
 
     if failed_closed:
         print("\n  FAIL-CLOSED on %d of %d tool(s): %s"
               % (len(failed_closed), len(manifest["tools"]), ", ".join(failed_closed)))
+        if rc == ERROR:
+            print("  EVERY tool failed closed, so the classifier never ran at all.")
+            print("  That is a configuration failure (credential? network?), NOT a")
+            print("  finding about this server. Fix it or drop --live; do not read")
+            print("  this as a verdict.")
+        else:
+            print("  The classifier did not run for these. A check that did not run")
+            print("  is not a check that passed -- treating this as GATE.")
+    return rc
+
+
+def verdict_code(assessment, failed_closed, n_tools):
+    """The exit code for a triage assessment plus the classifier's non-runs."""
+    if failed_closed:
         # Found 2026-09-21 while writing the docs: with no credential EVERY tool
         # failed closed and this returned GATE -- telling the user the SERVER is
         # dangerous when the truth was that their API key was missing. A finding
         # about the subject and a failure of the instrument are different things
         # and must not share an exit code.
-        if len(failed_closed) == len(manifest["tools"]):
-            print("  EVERY tool failed closed, so the classifier never ran at all.")
-            print("  That is a configuration failure (credential? network?), NOT a")
-            print("  finding about this server. Fix it or drop --live; do not read")
-            print("  this as a verdict.")
-            return ERROR
-        print("  The classifier did not run for these. A check that did not run")
-        print("  is not a check that passed -- treating this as GATE.")
-        return GATE
-
-    return GATE if a_["verdict"] in ("GATE", "REVIEW") else SHIP
+        return ERROR if len(failed_closed) == n_tools else GATE
+    return GATE if assessment["verdict"] in ("GATE", "REVIEW") else SHIP
 
 
 if __name__ == "__main__":

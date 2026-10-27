@@ -73,6 +73,12 @@ repos:
     hooks: [{id: prodsec-gate}]
 ```
 
+**Name committed dumps `<server>.tools.json`** (for example
+`github.tools.json`). The hook also still matches `*dump*.json`. It does *not*
+match `.mcp.json`: that file is a Claude Code server **config** (`mcpServers`
+→ command and args), not a `tools/list` dump, and grading it would fail every
+commit that touched it with exit 2.
+
 **Known weakness, disclosed:** the `files:` selector is a regex over filenames.
 That is exactly the class of control this workspace spent August taking apart —
 a rule that names a spelling rather than an effect. A dump called
