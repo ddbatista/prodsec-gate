@@ -21,7 +21,8 @@ SHIPPED = (glob.glob(os.path.join(ROOT, "tooling", "*.py"))
            + [os.path.join(ROOT, "pyproject.toml"),
               os.path.join(ROOT, ".pre-commit-hooks.yaml")])
 # User docs point at the notes too, rather than retelling the course.
-DOCS = ([os.path.join(ROOT, "README.md"), os.path.join(ROOT, "tooling", "README.md")]
+DOCS = ([os.path.join(ROOT, "README.md"), os.path.join(ROOT, "CHANGELOG.md"),
+         os.path.join(ROOT, "tooling", "README.md")]
         + [p for p in glob.glob(os.path.join(ROOT, "docs", "*.md")) if p != NOTES])
 
 COURSE_MARKERS = re.compile(
