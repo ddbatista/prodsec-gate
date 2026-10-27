@@ -41,10 +41,13 @@ EXIT: 0 every citation checks out · 1 fabricated/misplaced/dropped present
       2 nothing was scored (a configuration failure, not a clean pass)
 """
 import argparse
-import json
 import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import _cli                      # noqa: E402
 
 REQUIRED = ("layer", "title", "file", "line", "quote", "scenario", "falsifier")
 LAYERS = {
@@ -56,7 +59,7 @@ LAYERS = {
     6: "Security & Compliance",
     7: "Agent Ecosystem",
 }
-OK, FINDINGS_BAD, ERROR = 0, 1, 2
+OK, FINDINGS_BAD = _cli.SHIP, _cli.GATE
 
 
 def norm(s):
@@ -190,16 +193,11 @@ def self_test():
 
 
 def load(path):
-    raw = sys.stdin.read() if path == "-" else open(path).read()
-    if not raw.strip():
-        print("ERROR: no input. If you piped this, read the UPSTREAM error --\n"
-              "       shells return only the last exit code. Use: set -o pipefail",
-              file=sys.stderr)
-        sys.exit(ERROR)
-    d = json.loads(raw)
+    d = _cli.read_json(path)
     return d["findings"] if isinstance(d, dict) and "findings" in d else d
 
 
+@_cli.entrypoint
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="prodsec-maestro",
@@ -228,19 +226,11 @@ def main(argv=None):
         ap.error("a findings file is required (or - for stdin); "
                  "use --prompt to print the pass prompt instead")
 
-    try:
-        findings = load(a.findings)
-    except json.JSONDecodeError as e:
-        print("ERROR: input is not JSON: %s" % e, file=sys.stderr)
-        return ERROR
-    except OSError as e:
-        print("ERROR: cannot read input: %s" % e, file=sys.stderr)
-        return ERROR
-
+    findings = load(a.findings)
     if not isinstance(findings, list) or not findings:
-        print("ERROR: no findings in the input. Nothing was scored, so this is a\n"
-              "       configuration failure, not a clean pass.", file=sys.stderr)
-        return ERROR
+        raise _cli.NotAudited(
+            "no findings in the input. Nothing was scored, so this is a\n"
+            "       configuration failure, not a clean pass.")
 
     buckets = {"CITED": [], "MISPLACED": [], "FABRICATED": [], "DROPPED": [],
                "RESOLVED": [], "UNFIXED": []}

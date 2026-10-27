@@ -39,10 +39,11 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+import _cli                      # noqa: E402
 import mcp_adapter as A          # noqa: E402
 import triage as T               # noqa: E402
 
-SHIP, GATE, ERROR = 0, 1, 2
+SHIP, GATE, ERROR = _cli.SHIP, _cli.GATE, _cli.ERROR
 
 
 # The keyword floor's measured recall on the 12-tool labelled corpus
@@ -116,6 +117,7 @@ def _tools(dump):
     raise ValueError("could not find a tools list in input")
 
 
+@_cli.entrypoint
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="prodsec-gate",
@@ -136,27 +138,7 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="emit the manifest and exit")
     a = ap.parse_args(argv)
 
-    try:
-        raw = sys.stdin.read() if a.dump == "-" else open(a.dump).read()
-    except OSError as e:
-        print("ERROR: cannot read input: %s" % e, file=sys.stderr)
-        return ERROR
-    # Empty input almost always means the UPSTREAM command failed and the pipe
-    # swallowed it. Reporting "not JSON" here sends you looking in the wrong
-    # place -- observed 2026-09-21 when prodsec-fetch hit a 403 and this said
-    # "Expecting value: line 1 column 1".
-    if not raw.strip():
-        print("ERROR: no input.\n"
-              "       If you piped this, the upstream command produced nothing --\n"
-              "       read ITS error, not this one. Shells return only the LAST\n"
-              "       exit code in a pipeline, so add:  set -o pipefail",
-              file=sys.stderr)
-        return ERROR
-    try:
-        dump = json.loads(raw)
-    except json.JSONDecodeError as e:
-        print("ERROR: input is not JSON: %s" % e, file=sys.stderr)
-        return ERROR
+    dump = _cli.read_json(a.dump)
 
     backend = None
     if a.live:

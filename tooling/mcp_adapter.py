@@ -23,8 +23,13 @@ Reads either a full tools/list response ({"result": {"tools": [...]}}) or a
 bare {"tools": [...]} or a bare [...] array.
 """
 import json
+import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import _cli                      # noqa: E402
 
 # --- Keyword heuristics: name + description -> trifecta capabilities ----------
 # Deliberately conservative & legible. Tune these against real servers.
@@ -224,16 +229,25 @@ def adapt(dump):
     return manifest, warnings
 
 
-def main():
-    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
-        print(__doc__); sys.exit(0)
-    src = sys.stdin if sys.argv[1] == "-" else open(sys.argv[1])
-    dump = json.load(src)
-    manifest, warnings = adapt(dump)
+@_cli.entrypoint
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__)
+        return _cli.SHIP if argv else _cli.ERROR
+    try:
+        manifest, warnings = adapt(_cli.read_json(argv[0]))
+    except ValueError as e:
+        raise _cli.NotAudited(str(e))
+    # No finding state here, so the only honest codes are "produced a
+    # manifest" (0) and "did not" (2). An empty one is the latter.
+    if not manifest["tools"]:
+        raise _cli.NotAudited("the dump contains no tools. Nothing was audited.")
     for w in warnings:
         sys.stderr.write("INFER: %s\n" % w)
     print(json.dumps(manifest, indent=2, ensure_ascii=False))
+    return _cli.SHIP
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

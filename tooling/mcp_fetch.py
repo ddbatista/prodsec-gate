@@ -24,11 +24,16 @@ Wire format (stdio): newline-delimited JSON-RPC.
 """
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
 import urllib.error
 import urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import _cli                      # noqa: E402
 
 PROTOCOL = "2025-06-18"
 VERSION = "0.1.1"
@@ -126,6 +131,7 @@ def fetch_http(url, headers=None, timeout=30):
     return got
 
 
+@_cli.entrypoint
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="prodsec-fetch",
@@ -148,7 +154,7 @@ def main(argv=None):
                       "--i-will-execute-this, ideally inside the sandbox:\n"
                       "  claude --settings '{\"sandbox\":{\"enabled\":true,"
                       "\"allowUnsandboxedCommands\":false}}'", file=sys.stderr)
-                return 2
+                return _cli.ERROR
             dump = fetch_stdio(a.stdio)
         else:
             headers = dict(h.split(":", 1) for h in a.header)
@@ -184,14 +190,14 @@ def main(argv=None):
               "  claude mcp login <name>\n"
               "Then pass your own token here with --header 'Authorization: Bearer ...'"
               % a.http, file=sys.stderr)
-        return 2
+        return _cli.ERROR
     except Exception as e:
         print("ERROR: %s: %s" % (type(e).__name__, e), file=sys.stderr)
-        return 2
+        return _cli.ERROR
 
     json.dump(dump, sys.stdout, indent=2)
     print()
-    return 0
+    return _cli.SHIP
 
 
 if __name__ == "__main__":

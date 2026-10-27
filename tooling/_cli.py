@@ -10,6 +10,7 @@ must never share an exit code with a finding.
 """
 import functools
 import json
+import os
 import sys
 
 SHIP, GATE, ERROR = 0, 1, 2
@@ -62,7 +63,9 @@ def read_json(path):
     except OSError as e:
         raise NotAudited("cannot read input: %s" % e)
     # Empty input almost always means the UPSTREAM command failed and the pipe
-    # swallowed it; "not JSON" would send you looking in the wrong place.
+    # swallowed it; "not JSON" would send you looking in the wrong place --
+    # observed 2026-09-21 when prodsec-fetch hit a 403 and the gate said
+    # "Expecting value: line 1 column 1".
     if not raw.strip():
         raise NotAudited(
             "no input.\n"
@@ -73,3 +76,11 @@ def read_json(path):
         return json.loads(raw)
     except json.JSONDecodeError as e:
         raise NotAudited("input is not JSON: %s" % e)
+
+
+def chdir_project(path):
+    """cd into the --project an auditor was pointed at, or raise NotAudited."""
+    try:
+        os.chdir(path)
+    except OSError as e:
+        raise NotAudited("cannot use --project %s: %s" % (path, e))
