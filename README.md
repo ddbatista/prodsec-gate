@@ -151,6 +151,7 @@ exit code, so an upstream fetch failure can be masked by a downstream success.
 ## Verify it yourself
 
 ```sh
+python3 -m unittest discover                          # stdlib only, no dev dependencies
 python3 tooling/audit_agent_config.py --self-test     # 12/12
 python3 tooling/audit_allowlist.py  --self-test       # 15/15, then 11/11
 python3 tooling/policy_guard_hook.py --self-test      # 22/22
