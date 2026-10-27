@@ -1,6 +1,6 @@
 # Packaging, CI and the pre-commit hook
 
-How the tooling travels. Built in Capstone D1.
+How the tooling travels.
 
 ## `pyproject.toml`
 
@@ -37,7 +37,7 @@ pipx install .          # ~/.local/bin/prodsec-*     (use everywhere)
 ```
 
 Installing into a throwaway venv proves portability and leaves you nothing.
-Both were done during D1; only the second is useful afterwards.
+Both work; only the second is useful afterwards.
 
 ## `.github/workflows/prodsec-gate.yml`
 
@@ -56,8 +56,8 @@ Three steps, in this order, because the order is the argument:
    run. In a consuming repo, gate your real dumps instead, where `exit 2` fails
    the build as hard as `exit 1`.
 
-Also: `permissions: contents: read` at the top, raised per job. That is the L08
-finding applied to what we ship.
+Also: `permissions: contents: read` at the top, raised per job — least
+privilege applied to what we ship.
 
 Run the `--live` pass on a schedule and open an issue on disagreement. Never
 block a merge on it.
@@ -80,7 +80,8 @@ match `.mcp.json`: that file is a Claude Code server **config** (`mcpServers`
 commit that touched it with exit 2.
 
 **Known weakness, disclosed:** the `files:` selector is a regex over filenames.
-That is exactly the class of control this workspace spent August taking apart —
+That is exactly the class of control
+[the design notes](design-notes.md#rules-name-tools-not-effects) take apart —
 a rule that names a spelling rather than an effect. A dump called
 `servers.json` is not matched. Widen the pattern for your repo, or invoke the
 gate explicitly in CI where the file list is yours to control.
@@ -89,5 +90,6 @@ gate explicitly in CI where the file list is yours to control.
 
 A real (tiny) MCP stdio server, so the fetch → gate pipeline can be demonstrated
 without downloading anyone's code. It advertises one honest tool and one whose
-description is written the way X3's was — so the demo ends in a `SHIP` that is
-*wrong*, which is the point.
+egress is phrased so the keyword floor misses it — so the demo ends in a `SHIP`
+that is *wrong*, which is the point
+([why](design-notes.md#keyword-floor-misses-egress)).

@@ -1,11 +1,9 @@
 # Offline checks only. Nothing here calls a model.
 #
 # The rule this file exists to encode: a REQUIRED check must be free,
-# deterministic, offline and fast. The live classifier (L17) is none of those
-# -- it adds a network call, a credential, money and non-determinism. A gate
-# that fails because someone's API quota ran out teaches people to bypass
-# gates. Run the live pass on a schedule and report it; never block a merge
-# on it.
+# deterministic, offline and fast. The live classifier is none of those, so
+# it never runs here: run the live pass on a schedule and report it; never
+# block a merge on it. See docs/design-notes.md#offline-by-default.
 name: prodsec-gate
 
 on:

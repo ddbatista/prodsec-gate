@@ -9,7 +9,8 @@ third-party code on your machine, before you have decided whether to trust it.
 The vetting step requires the subject to execute. That is not a flaw in the
 plan, it is the shape of the problem -- and it is why this refuses to spawn
 anything without --i-will-execute-this, and why the right place to run it is
-inside the L13 sandbox with no write access and no egress beyond the server.
+inside the Claude Code sandbox with no write access and no egress beyond the
+server. See docs/design-notes.md#fetch-executes-code.
 
     claude --settings '{"sandbox":{"enabled":true,"allowUnsandboxedCommands":false}}'
 
@@ -42,7 +43,7 @@ CLIENT = {"name": "prodsec-gate", "version": VERSION}
 
 class NeedsAuth(RuntimeError):
     """401 + WWW-Authenticate. This is the MCP authorization spec working as
-    designed (L06): the server is a protected resource and is telling you where
+    designed: the server is a protected resource and is telling you where
     its metadata lives, per RFC 9728. It is not an error in your request."""
 
     def __init__(self, www_authenticate):
@@ -90,10 +91,9 @@ def fetch_http(url, headers=None, timeout=30):
     hdrs = {"Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
             # Without this, urllib sends "Python-urllib/3.x" and CDNs in front
-            # of real MCP servers fingerprint-block it: mcp.sentry.dev returned
-            # Cloudflare "Error 1010: blocked based on your browser's
-            # signature" (403), which reads as the SERVER refusing you when it
-            # is a CDN that never let the request through. Found 2026-09-21.
+            # of real MCP servers fingerprint-block it with a 403 that reads as
+            # the SERVER refusing you, when a CDN never let the request through.
+            # See docs/design-notes.md#fetch-executes-code.
             "User-Agent": "prodsec-gate/%s (+MCP tools/list vetting)" % VERSION,
             "MCP-Protocol-Version": PROTOCOL}
     hdrs.update(headers or {})
@@ -160,12 +160,9 @@ def main(argv=None):
             headers = dict(h.split(":", 1) for h in a.header)
             dump = fetch_http(a.http, {k: v.strip() for k, v in headers.items()})
     except NeedsAuth as e:
-        # Only claim what the server actually sent. api.anthropic.com returns
-        # 401 with an EMPTY WWW-Authenticate, and the original wording promised
-        # "a pointer to its metadata" above a blank line -- describing the spec
-        # instead of the response. Found 2026-09-21 when the learner asked
-        # whether any of this output was hardcoded; the answer was no, but the
-        # message asserted more than had been observed.
+        # Only claim what the server actually sent: some servers answer 401
+        # with an EMPTY WWW-Authenticate, and the message must describe the
+        # response, not the spec. See docs/design-notes.md#fetch-executes-code.
         if e.metadata_url:
             print("AUTH REQUIRED — and this is the MCP authorization spec working,\n"
                   "not a failure. The server is an OAuth 2.1 protected resource and\n"

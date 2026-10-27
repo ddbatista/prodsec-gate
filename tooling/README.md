@@ -1,7 +1,6 @@
 # tooling/
 
-> **This file documents `triage.py` and `mcp_adapter.py` as built in lessons
-> 03–04.** Since then the workspace shipped a package. Start at the
+> **This file documents `triage.py` and the manifest schema.** Start at the
 > [root README](../README.md); per-tool docs for the newer commands are in
 > [`docs/`](../docs/):
 > [prodsec-gate](../docs/prodsec-gate.md) ·
@@ -14,8 +13,6 @@ A static reviewer for agentic systems. Reads an agent manifest, tags the
 trifecta legs, applies the Rule of Two (+ irreversibility override), and maps
 findings to the OWASP Top 10 for Agentic Applications (2026).
 
-Built in Lesson 03.
-
 ## Run
 
 ```sh
@@ -23,7 +20,7 @@ python3 triage.py sample-agent.json        # trifecta → GATE
 python3 triage.py delete-db-agent.json      # 2 legs but irreversible → GATE
 python3 triage.py delete-db-agent-fixed.json # hardened → SHIP
 
-# Audit a real MCP server's advertised tools (Lesson 04):
+# Audit a real MCP server's advertised tools:
 python3 gate.py mcp-dump.json                    # verdict + exit code
 python3 gate.py mcp-dump.json --json             # inferred manifest (notes inline), same exit code
 python3 gate.py mcp-dump.json --json | python3 triage.py -   # grade the manifest yourself

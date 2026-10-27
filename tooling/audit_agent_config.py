@@ -2,10 +2,9 @@
 """
 audit_agent_config.py — audit YOUR coding agent against the placement ladder.
 
-L08 (2026-08-03) built the Claude Code pass. L09 (2026-08-07) generalised it:
-the audit is not a settings-file checklist, it is six portable questions asked
-of whatever agent you happen to be running. Same ladder
-(reference/control-placement-ladder.html), four targets:
+The audit is not a settings-file checklist: it is six portable questions asked
+of whatever agent you happen to be running, placed on one control ladder
+(model -> harness -> environment), across these targets:
 
     --agent claude    .claude/settings.json across four scopes
     --agent codex     ~/.codex/config.toml, .codex/config.toml, requirements.toml
@@ -138,16 +137,14 @@ def mentions(rule_list, needles):
 
 
 # --------------------------------------------------------------------------
-# F8 (found 2026-09-17 by the L15 MAESTRO pass). mentions() is a bare
-# substring test over whole rule text, and it was deciding two HIGH/OK
-# findings. Two ways it was wrong, both verified:
+# mentions() is a bare substring test over whole rule text, and it used to
+# decide two HIGH/OK findings. Two ways it was wrong, both verified
+# (docs/design-notes.md#rule-matching-not-substring):
 #
 #   * Write(.claude/settings*.json) matched, so the audit reported "the agent
-#     cannot rewrite its own constraints" for a rule that is NEVER CONSULTED.
-#     falsify_path_guard.py prints INERT for the same rule and exits 1. Two
-#     tools, same directory, opposite verdicts -- and the reassuring one owned
-#     the exit code. Record 0013 established this four weeks ago and the fix
-#     landed in the prose and not in this function.
+#     cannot rewrite its own constraints" for a rule that is NEVER CONSULTED --
+#     while falsify_path_guard.py printed INERT for the same rule, and the
+#     reassuring verdict was the one that owned the exit code.
 #   * WebFetch(domain:credentials.example.com) matched SECRET_TARGETS, so an
 #     egress allow rule counted as evidence that secret paths were denied.
 #
@@ -251,7 +248,7 @@ class Report:
 
 
 # ===========================================================================
-#  TARGET 1 · Claude Code  (L08)
+#  TARGET 1 · Claude Code
 # ===========================================================================
 
 def audit_claude(r):
@@ -290,7 +287,8 @@ def audit_claude(r):
         r.add("HIGH", "harness", "Agent can edit the file that constrains it",
               "No deny rule covers .claude/settings*.json.\n"
               "Write/Edit are enabled by default, so the permission rules are\n"
-              "attacker-writable — they fail the (b) half of the control test.\n"
+              "attacker-writable — they fail property (b) of the control test:\n"
+              "a control must not be writable by the party it constrains.\n"
               "Contrast: Codex closes this at the rung BELOW — its sandbox keeps\n"
               ".codex/ read-only even inside a writable root.\n"
               "FIX: deny \"Edit(.claude/settings*.json)\" — Edit covers EVERY built-in\n"
@@ -315,8 +313,9 @@ def audit_claude(r):
               '"Read(~/.aws/**)".')
 
     # ---- leg ③ — egress ----------------------------------------------------
-    # Same class as F8: mentions() here would count Read(./curl-notes.txt)
-    # as an egress control. Bash rules only, matched on the command spec.
+    # Same substring-matching family as above: mentions() would count
+    # Read(./curl-notes.txt) as an egress control. Bash rules only, matched on
+    # the command spec.
     egress_denied = command_rules(merged_deny, EGRESS_COMMANDS)
     egress_asked = command_rules(merged_ask, EGRESS_COMMANDS)
     if egress_denied or egress_asked:
@@ -327,7 +326,7 @@ def audit_claude(r):
               "No deny/ask rule matches curl / wget / nc / scp.\n"
               "Leg ③ is open at the command layer. Note this is a DESTINATION\n"
               "problem: a rule per binary is a wrapper, not a choke point —\n"
-              "the Environment-layer answer is an egress policy (L07 D2).")
+              "the Environment-layer answer is an egress policy.")
 
     # ---- blanket allows ----------------------------------------------------
     blanket = [x for x in merged_allow if str(x).strip() in ("Bash(*)", "Bash", "*")]
@@ -370,12 +369,14 @@ def audit_claude(r):
 
 
 # ---------------------------------------------------------------------------
-#  L11 · THE SECOND AXIS — the permission MODE
+#  THE SECOND AXIS — the permission MODE
+#  (the control test these findings use: docs/design-notes.md#control-test)
 #
-#  L09 took two axes from Codex: the sandbox is what the agent CAN do, the
-#  approvals setting is when it ASKS. Claude Code has the same pair and we only
-#  ever audited one of them. Rules say what is allowed; the MODE decides what
-#  happens to everything the rules did NOT decide. Same rules, different mode,
+#  Codex has two axes: the sandbox is what the agent CAN do, the approvals
+#  setting is when it ASKS. Claude Code has the same pair, and a rules-only
+#  audit covers one of them (docs/design-notes.md#mode-is-second-axis).
+#  Rules say what is allowed; the MODE decides what happens to everything the
+#  rules did NOT decide. Same rules, different mode,
 #  different enforcement — so a rules-only audit reports on a configuration
 #  that does not exist.
 #
@@ -481,7 +482,7 @@ def audit_claude_modes(r, configs, merged_deny, merged_ask, merged_allow):
 
 
 # ===========================================================================
-#  TARGET 2 · Codex CLI  (L09)
+#  TARGET 2 · Codex CLI
 # ===========================================================================
 
 def codex_effective(configs, key, default=None):
@@ -567,12 +568,12 @@ def audit_codex(r):
               "[sandbox_workspace_write] network_access = %r.\n"
               "This is the cleanest egress switch any of these agents exposes, and\n"
               "it is currently open: leg ③ needs no curl, just any process the\n"
-              "agent starts. Turning it off is the L07-Day-2 egress control, one\n"
-              "line, enforced below the tool." % (net,))
+              "agent starts. Turning it off is an egress control in one line,\n"
+              "enforced below the tool." % (net,))
     elif net in (False, "blocked", "disabled"):
         r.add("OK", "environment", "Codex network access blocked in workspace-write",
               "network_access = %r — leg ③ severed at the Environment rung.\n"
-              "This is the same control you built by hand in L07 D2, shipped." % (net,))
+              "An egress choke point below the tools, shipped by the vendor." % (net,))
     roots = ww.get("writable_roots") or []
     if roots:
         r.add("LOW", "environment", "Codex writable_roots extends the sandbox",
@@ -615,7 +616,7 @@ def audit_codex(r):
 
 
 # ===========================================================================
-#  TARGET 3 · Cursor  (L09)
+#  TARGET 3 · Cursor
 # ===========================================================================
 
 def audit_cursor(r):
@@ -668,15 +669,15 @@ def audit_cursor(r):
     if wild:
         r.add("MED", "harness", "Cursor MCP allowlist contains wildcards",
               "Entries: %s\nA `server:*` entry pre-approves every tool that server\n"
-              "exposes now AND every tool it adds later — the tool-list drift you\n"
-              "flagged in L04. Enumerate the tools you actually need."
+              "exposes now AND every tool it adds later (tool-list drift).\n"
+              "Enumerate the tools you actually need."
               % ", ".join(map(str, wild[:4])))
 
     if autorun.get("block_instructions") or autorun.get("allow_instructions"):
         r.add("MED", "model", "Cursor autoRun instructions are prompt text, not rules",
               "allow_instructions / block_instructions steer the Auto-review\n"
-              "classifier. They are English sentences fed to a model — the exact\n"
-              "thing L07 Variant 1 graded as NOT a control. Useful; not a gate.")
+              "classifier. They are English sentences fed to a model, and prompt\n"
+              "text is not a control. Useful; not a gate.")
 
     if Path(".cursorignore").exists():
         r.add("OK", "harness", ".cursorignore present in this project",
@@ -694,7 +695,7 @@ def audit_cursor(r):
 
 
 # ===========================================================================
-#  TARGET 4 · an agent YOU wrote  (L09)
+#  TARGET 4 · an agent YOU wrote
 # ===========================================================================
 
 def audit_harness(r, directory):
@@ -702,14 +703,15 @@ def audit_harness(r, directory):
 
     LIMITS (read before believing any finding below):
       * This is a syntactic AST + NAME heuristic — the same class of signal as
-        the L03 keyword baseline, with the same failure modes. It sees the SHAPE
+        a keyword baseline, with the same failure modes. It sees the SHAPE
         of a call graph, never its semantics.
       * It cannot follow indirection: a callable passed in, a dict of handlers,
         getattr dispatch, or a gate imported under an alias all defeat it.
       * A function containing the word `enforce` passes, whether or not it
         enforces anything. Naming is not evidence.
       * So: treat every finding as a POINTER TO READ A FUNCTION, never as a
-        verdict. The verdict comes from redteam_bypass.py actually failing.
+        verdict. The verdict comes from a red-team eval actually failing.
+        See docs/design-notes.md#harness-audit-reads-names.
     """
     print("\n### YOUR OWN HARNESS · %s ###" % directory)
     d = Path(directory)
@@ -736,10 +738,10 @@ def audit_harness(r, directory):
                      and any(h in n.func.attr.lower() for h in TRANSPORT_HINTS)]
             if not calls:
                 continue
-            # IDENTIFIERS ONLY. v1 of this check dumped the whole AST, which
-            # includes docstrings — so notify_webhook (the L07 D2 bypass) passed
-            # because its docstring *mentions* ALLOWED_RECIPIENTS. Prose is not
-            # enforcement; a heuristic that reads prose grades prose.
+            # IDENTIFIERS ONLY. Scanning the whole AST includes docstrings, so a
+            # bypass tool passed because its docstring *mentioned* the
+            # allow-list. Prose is not enforcement; a heuristic that reads prose
+            # grades prose.
             names = set()
             for n in ast.walk(node):
                 if isinstance(n, ast.Name):
@@ -759,8 +761,8 @@ def audit_harness(r, directory):
     if unguarded:
         r.add("MED", "harness", "%d path(s) reach the transport naming no gate"
               % len(unguarded),
-              "%s\nThis is the L07 Day-2 shape: the control lives in a SIBLING\n"
-              "function, so it protects the paths someone remembered to wrap.\n"
+              "%s\nThe control lives in a SIBLING function, so it protects\n"
+              "only the paths someone remembered to wrap.\n"
               "Read each one and ask whether it can be called with an\n"
               "attacker-chosen destination." % "\n".join(unguarded))
     if guarded:
@@ -772,7 +774,7 @@ def audit_harness(r, directory):
         r.add("OK", "environment", "An egress choke point exists below the tools",
               "The transport itself refuses non-allowlisted destinations, so an\n"
               "unwrapped sibling tool does not get a free exfil path. This is the\n"
-              "rung that made L07 D2 hold.")
+              "rung that holds when a per-tool control is missed.")
     else:
         r.add("HIGH", "environment", "No egress choke point in the transport",
               "Every control here is per-function. Add the check inside the thing\n"
@@ -789,7 +791,7 @@ def audit_harness(r, directory):
     elif falsifiable:
         r.add("OK", "harness+", "Eval ships a falsification case",
               "Files: %s\nDisabling the control flips the verdict, so a PASS means\n"
-              "the control caused it. This is the standard you set in L07."
+              "the control caused it."
               % ", ".join(falsifiable))
     else:
         r.add("MED", "harness+", "Red-team eval with no visible falsification case",
@@ -827,9 +829,10 @@ PORTABLE_SIX = """
 
 
 # ===========================================================================
-#  TARGET 5 · The environment surface  (L14)
+#  TARGET 5 · The environment surface
+#  (docs/design-notes.md#environment-surface)
 #
-#  Every control this workspace has built is PATH-SHAPED: Read(./.env),
+#  The usual controls are PATH-SHAPED: Read(./.env),
 #  Edit(path), the hook's protected paths, sandbox filesystem.denyRead. Leg (2)
 #  has two other shapes that no path rule reaches:
 #
@@ -994,16 +997,17 @@ def audit_env_surface(r):
 
 
 # ===========================================================================
-#  SELF-TEST · pins the F8 family so it cannot silently come back
+#  SELF-TEST · pins the substring-matching family so it cannot come back
 #
-#  Every case below is a verdict this tool actually got wrong on 2026-09-17,
-#  or the control case proving the fix did not overcorrect. Offline, no config.
+#  Every case below is a verdict this tool once got wrong, or the control case
+#  proving the fix did not overcorrect. Offline, no config.
+#  See docs/design-notes.md#rule-matching-not-substring.
 # ===========================================================================
 
 RULE_CASES = [
     # (rules, needles, kind, expect_consulted, expect_inert, note)
     (["Write(.claude/settings*.json)"], ["settings.json", ".claude/"], "file",
-     0, 1, "F8: L08's own prescription is INERT, not protection"),
+     0, 1, "a Write(path) deny is INERT, not protection"),
     (["Edit(.claude/settings*.json)"], ["settings.json", ".claude/"], "file",
      1, 0, "the rule that actually works"),
     (["Read(.claude/settings.json)"], ["settings.json"], "file",
@@ -1031,7 +1035,7 @@ RULE_CASES = [
 
 def self_test():
     print("=" * 74)
-    print(" SELF-TEST · rule matching (pins the F8 substring family)")
+    print(" SELF-TEST · rule matching (pins the substring-matching family)")
     print("=" * 74)
     bad = 0
     for rules_, needles, kind, want_c, want_i, note in RULE_CASES:
@@ -1045,8 +1049,8 @@ def self_test():
               % ("PASS" if ok else "FAIL", rules_[0][:34], len(c), len(i), note))
     print("\n %d/%d pass" % (len(RULE_CASES) - bad, len(RULE_CASES)))
     print("\n The eval this file vouches for is checked by RUNNING it, not by")
-    print(" grepping for the word 'falsif' -- see X1. redteam_stepup.py's own")
-    print(" --falsify run must flip the verdict; it did not until 2026-09-17.")
+    print(" grepping for the word 'falsif': a red-team eval's --falsify run must")
+    print(" actually flip its verdict.")
     return bad
 
 

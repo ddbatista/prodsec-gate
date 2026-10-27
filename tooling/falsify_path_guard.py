@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-falsify_path_guard.py — L10: does a deny rule on a path actually protect the path?
+falsify_path_guard.py — does a deny rule on a path actually protect the path?
 
-L08 found that Claude Code's permission rules live in a file the agent can write,
-and prescribed the obvious fix:
+Claude Code's permission rules live in a file the agent can write, and the
+obvious fix is:
 
     "deny": ["Write(.claude/settings*.json)", "Edit(.claude/settings*.json)"]
 
@@ -14,8 +14,8 @@ file. So the question is not "is Write denied?" but:
     which of the surfaces that can produce this effect are covered?
 
 Every uncovered surface is an equivalent-effect path: same outcome, different
-tool, no rule in the way. Structurally identical to the L07 Day-2 bypass, where
-`notify_webhook` reached the transport that `send_email_guarded` was protecting.
+tool, no rule in the way -- like a sibling tool reaching the transport that a
+guarded tool was protecting. See docs/design-notes.md#rules-name-tools-not-effects.
 
 REVISED 2026-08-16. The first version of this script inferred matching semantics
 because the settings reference doesn't document them. The PERMISSIONS reference
@@ -23,9 +23,9 @@ does, and it says two things that changed the model:
 
   * Only `Read(path)` and `Edit(path)` rules are ever consulted for file access.
     A path rule written for Write, NotebookEdit, Glob or MultiEdit is accepted
-    and NEVER USED (startup warning). So L08's `deny: Write(.claude/settings*.json)`
+    and NEVER USED (startup warning). So `deny: Write(.claude/settings*.json)`
     is an INERT RULE THAT READS LIKE A CONTROL. Meanwhile `Edit(path)` covers
-    every built-in editing tool, so one correct rule beats the two we prescribed.
+    every built-in editing tool, so one correct rule beats the two-rule fix above.
   * Read/Edit deny rules ALSO apply to file commands Claude Code recognises in
     Bash — "such as cat, head, tail, and sed" — but NOT to "arbitrary
     subprocesses that read or write files indirectly, like a Python or Node
@@ -142,7 +142,7 @@ def path_matches(pattern, target):
 
 
 # ---------------------------------------------------------------------------
-# SURFACE C · containment (added 2026-09-14, lesson 13)
+# SURFACE C · containment
 #
 # The three interpreter rows above are UNCOVERED because permission rules are
 # an ENUMERATION: they name tools and commands, and "a Python or Node script

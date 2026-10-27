@@ -6,8 +6,7 @@ Reads an agent manifest (JSON), tags each tool with the trifecta legs it
 introduces, applies the Rule of Two (+ an irreversibility override), and maps
 findings to the OWASP Top 10 for Agentic Applications (2026).
 
-This is the automated successor to the manual Agent Security-Review Checklist
-(reference/agent-security-review-checklist.html). v0.1.
+This is the automated successor to a manual agent security-review checklist.
 
 Usage:
     python3 triage.py <manifest.json | ->

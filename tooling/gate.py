@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """
-gate.py — the capstone. One command, one verdict, one exit code.
+gate.py — one command, one verdict, one exit code.
 
-Seventeen lessons of artifacts, assembled into the thing that was the point:
-a gate you can put in front of an MCP server before it enters your org's agent
-catalogue. Everything it does was built and argued for elsewhere in this repo:
+A gate you can put in front of an MCP server before it enters your org's agent
+catalogue:
 
-    tools/list dump          the untrusted input (L04)
-      -> mcp_adapter.infer_signalled()
-           keyword floor                                        (L04)
-           + classifier signal, UNION ONLY, fail closed         (L17)
-      -> triage verdict: legs, Rule of Two, irreversibility     (L01, L03)
+    tools/list dump          the untrusted input
+      -> mcp_adapter.build_manifest()
+           keyword floor
+           + optional classifier signal, UNION ONLY, fail closed
+      -> triage verdict: legs, Rule of Two, irreversibility
       -> EXIT CODE                                              (the API)
 
 EXIT CODES ARE THE INTERFACE. In CI nothing reads your prose:
@@ -19,17 +18,13 @@ EXIT CODES ARE THE INTERFACE. In CI nothing reads your prose:
     1  GATE    full trifecta or an irreversible action -- do not run autonomously
     2  ERROR / NOT AUDITED -- a configuration failure, NOT a pass
 
-The 2 is the one that matters and it is the lesson this file was written
-around. On 2026-09-20 `audit_allowlist.py` was found exiting **0** when run
-against a directory containing no config at all: "no rules found" and "rules
-found and they are fine" produced the same green light. A gate that passes
-when it did not run is worse than no gate, because something downstream
-believes it. Every "nothing to audit" path here exits 2.
+The 2 is the one that matters: every "nothing to audit" path exits 2, never 0.
+See docs/design-notes.md#exit-2-not-audited.
 
 OFFLINE BY DEFAULT, ON PURPOSE. The whole path above is stdlib-only and
 deterministic, so it is safe to block a build on. `--live` adds the classifier
 and with it a network call, a credential, money and non-determinism -- none of
-which belong in a required check. See the `[live]` extra in pyproject.toml.
+which belong in a required check. See docs/design-notes.md#offline-by-default.
 """
 import argparse
 import json
@@ -49,12 +44,9 @@ SHIP, GATE, ERROR = _cli.SHIP, _cli.GATE, _cli.ERROR
 def print_instrument(n_tools, live, backend_name, n_failed):
     """Always say which instrument produced this verdict, and what it misses.
 
-    This is bug 1 of D1 applied to the gate's own headline path. `audit_allowlist`
-    used to print "no rules found" and exit 0 -- "did not look" and "looked and it
-    was fine" wearing the same face. The offline gate had the same shape one level
-    up: it printed VERDICT: SHIP with no statement that the classifier never ran
-    and that the floor alone misses 37.5% of the capabilities in our own corpus.
-    A verdict without its denominator is unattributable.
+    SHIP from the keyword floor alone means "no keyword matched", not "no
+    capability", and a verdict without its denominator is unattributable.
+    See docs/design-notes.md#verdict-carries-instrument.
     """
     print("-" * 64)
     print(" INSTRUMENT")
@@ -186,11 +178,10 @@ def main(argv=None, backend=None):
 def verdict_code(assessment, failed_closed, n_tools):
     """The exit code for a triage assessment plus the classifier's non-runs."""
     if failed_closed:
-        # Found 2026-09-21 while writing the docs: with no credential EVERY tool
-        # failed closed and this returned GATE -- telling the user the SERVER is
-        # dangerous when the truth was that their API key was missing. A finding
-        # about the subject and a failure of the instrument are different things
-        # and must not share an exit code.
+        # A finding about the subject and a failure of the instrument must not
+        # share an exit code: if EVERY tool failed closed the classifier never
+        # ran (a missing credential, say), which is not a verdict on the server.
+        # See docs/design-notes.md#exit-2-not-audited.
         return ERROR if len(failed_closed) == n_tools else GATE
     return GATE if assessment["verdict"] in ("GATE", "REVIEW") else SHIP
 

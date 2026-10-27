@@ -2,11 +2,10 @@
 """
 live_model.py — the thin adapter that makes MAESTRO layer 1 non-empty.
 
-Every eval in this workspace has run against a rigged target since L05:
-`agent.py:11` hardcodes the model's susceptibility so the lesson is
-deterministic and free. That was the right call for teaching a control, and
-the L15 MAESTRO pass named the cost of it — **layer 1 (Foundation Models) is
-EMPTY**, so nothing here has ever measured resistance, only containment.
+Until this adapter, every eval here ran against a rigged target that hardcodes
+the model's susceptibility, so MAESTRO layer 1 (Foundation Models) was EMPTY:
+nothing had measured resistance, only containment.
+See docs/design-notes.md#rigged-eval-disclosed.
 
 This calls a real model. Three facts from the API reference drive the design,
 and each one changes how the eval has to be written (verified 2026-09-17):
@@ -20,9 +19,8 @@ and each one changes how the eval has to be written (verified 2026-09-17):
 2. REFUSAL IS A THIRD OUTCOME. `stop_reason == "refusal"` arrives as HTTP 200
    with a category in `stop_details`. A refusal is NOT the control working and
    it is NOT the model resisting the injection — it is the request never being
-   answered. Counting it as "contained" overstates your control, which is the
-   whole failure this workspace exists to catch. Reported separately and kept
-   out of the denominator.
+   answered. Counting it as "contained" overstates your control. Reported
+   separately and kept out of the denominator.
 
 3. NO SERVER-SIDE FALLBACKS HERE, DELIBERATELY. The docs recommend enabling
    `fallbacks` by default on Opus-5 code so a refusal reroutes to another
@@ -32,8 +30,8 @@ and each one changes how the eval has to be written (verified 2026-09-17):
    fallbacks back on.
 
 Credentials are read from the environment by the SDK; nothing is stored here.
-Per L14: env vars reach every subprocess, so the key belongs only in the
-process that needs it.
+Env vars reach every subprocess, so the key belongs only in the process that
+needs it (docs/design-notes.md#environment-surface).
 """
 import os
 
@@ -70,10 +68,9 @@ def complete(system, user, max_tokens=1024, effort=None):
     faster and cheaper -- and may change how injectable the model is, so it is
     part of the configuration under test, not a free speed-up.
     """
-    # Clear it on ENTRY, not only on the refusal path. Found 2026-09-22 by the
-    # MAESTRO pass over harness/: the success path returned without touching
-    # this, so in an N-trial loop a refusal at trial 3 was still readable after
-    # trial 4 succeeded and got attributed to the wrong trial.
+    # Clear it on ENTRY, not only on the refusal path: otherwise, in an N-trial
+    # loop, a refusal at trial 3 is still readable after trial 4 succeeds and
+    # is attributed to the wrong trial.
     global LAST_REFUSAL
     LAST_REFUSAL = None
 
@@ -95,10 +92,9 @@ def complete(system, user, max_tokens=1024, effort=None):
     if resp.stop_reason == "refusal":
         sd = getattr(resp, "stop_details", None)
         cat = getattr(sd, "category", None)
-        # The explanation is the only field that says WHY. We were discarding
-        # it until 2026-09-20, when 57/60 live trials came back refused and the
-        # category alone ("cyber") could not distinguish "it saw the injection"
-        # from "it objected to the data".
+        # The explanation is the only field that says WHY: the category alone
+        # (e.g. "cyber") cannot distinguish "it saw the injection" from "it
+        # objected to the data". See docs/design-notes.md#rigged-eval-disclosed.
         LAST_REFUSAL = {"category": cat,
                         "explanation": getattr(sd, "explanation", None)}
         return ("", "refusal:%s" % (cat or "unspecified"))
