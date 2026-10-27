@@ -1,10 +1,7 @@
 """prodsec-adapter: a deprecated alias of `prodsec-gate --json` that never gates."""
-import os
 import unittest
 
-from tests.test_contract import ERROR, GATE, SHIP, run
-
-VULNERABLE = os.path.join("tooling", "mcp-dump.json")
+from tests.support import ERROR, GATE, SHIP, VULNERABLE, run
 
 
 class DeprecatedAlias(unittest.TestCase):

@@ -8,15 +8,16 @@ checked offline: no test in this file makes a network call.
 """
 import importlib.util
 import json
-import os
 import sys
 import unittest
 
-from tests.test_contract import ERROR, GATE, ROOT, TOOLING
-from tests.test_gate import HARMLESS, gate_in_process
+from tests.support import ERROR, GATE, HARMLESS, TOOLING, gate_in_process
 
 sys.path.insert(0, TOOLING)
 import mcp_adapter as A  # noqa: E402
+
+# The leg vocabulary, written out: the spec, not the module's constant.
+LEGS = {"untrusted_input", "private_data", "external_comms", "state_change"}
 
 # Keywords alone give this tool all four capabilities.
 LOUD = {"name": "fetch_and_send",
@@ -39,12 +40,11 @@ def says(text):
 class UnionOnly(unittest.TestCase):
 
     def test_a_downgrading_classifier_never_removes_a_leg(self):
-        keyword_caps, _, _ = A.infer(LOUD)
         for reply in ("none", "untrusted_input", "private_data"):
             with self.subTest(reply=reply):
                 caps, _, notes, ok = A.infer_signalled(LOUD, says(reply))
                 self.assertTrue(ok)
-                self.assertTrue(keyword_caps <= caps, caps)
+                self.assertEqual(caps, LEGS)
 
     def test_an_adding_classifier_adds_the_leg_and_says_so(self):
         caps, _, notes, ok = A.infer_signalled(QUIET, says("external_comms"))
@@ -53,9 +53,12 @@ class UnionOnly(unittest.TestCase):
         self.assertTrue(any("ADDED external_comms" in n for n in notes), notes)
 
     def test_none_is_a_real_answer(self):
-        caps, _, _, ok = A.infer_signalled(QUIET, says("none"))
-        self.assertTrue(ok)
-        self.assertEqual(caps, A.infer(QUIET)[0])
+        # Models capitalise and punctuate; that must not read as a non-run.
+        for reply in ("none", "None", "NONE.", " none \n"):
+            with self.subTest(reply=reply):
+                caps, _, _, ok = A.infer_signalled(QUIET, says(reply))
+                self.assertTrue(ok)
+                self.assertEqual(caps, set())
 
 
 class FailClosed(unittest.TestCase):
@@ -65,6 +68,7 @@ class FailClosed(unittest.TestCase):
                                ("junk", says("I cannot help with that.")),
                                ("empty", says("")),
                                ("whitespace", says("  \n ")),
+                               ("prose", says("None of these apply.")),
                                ("None", says(None))):
             with self.subTest(backend=label):
                 caps, _, notes, ok = A.infer_signalled(QUIET, backend)
@@ -73,7 +77,7 @@ class FailClosed(unittest.TestCase):
 
     def test_out_of_vocabulary_words_never_reach_the_manifest(self):
         caps, _, _, _ = A.infer_signalled(QUIET, says("external_comms\nrm -rf /\nadmin"))
-        self.assertTrue(caps <= set(A.CAP_VOCAB), caps)
+        self.assertEqual(caps, {"external_comms"})
 
 
 class GateFailedClosedSplit(unittest.TestCase):
@@ -81,6 +85,14 @@ class GateFailedClosedSplit(unittest.TestCase):
     def test_every_tool_failing_closed_is_an_instrument_failure(self):
         rc, _ = gate_in_process([HARMLESS], backend=raises)
         self.assertEqual(rc, ERROR)
+
+    def test_json_mode_says_so_on_stderr_too(self):
+        # stdout carries the manifest; a pipeline reading only stdout must not
+        # be the only place the failure shows.
+        rc, out, err = gate_in_process([HARMLESS, "--json"], backend=raises, stderr=True)
+        self.assertEqual(rc, ERROR)
+        self.assertEqual(json.loads(out)["verdict"], "ERROR")
+        self.assertRegex(err, r"(?m)^ERROR:")
 
     def test_some_tools_failing_closed_is_a_gate(self):
         def fails_on_get_time(system, payload):

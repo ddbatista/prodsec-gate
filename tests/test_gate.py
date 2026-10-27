@@ -3,38 +3,17 @@
 The CLI cannot inject a model, so the --live path is driven in-process through
 main(backend=...): the same code path, minus the network.
 """
-import contextlib
-import io
 import json
 import os
-import sys
 import unittest
 
-from tests.test_contract import ERROR, GATE, ROOT, SHIP, TOOLING, run
-
-sys.path.insert(0, TOOLING)
-import gate  # noqa: E402
-
-VULNERABLE = os.path.join("tooling", "mcp-dump.json")
-HARMLESS = os.path.join("tests", "fixtures", "harmless.tools.json")
+from tests.support import (ERROR, GATE, HARMLESS, ROOT, SHIP, VULNERABLE,
+                           gate_in_process, run)
 
 
 def gate_json(*args, stdin=""):
     p = run("gate", *args, "--json", stdin=stdin)
     return p, (json.loads(p.stdout) if p.stdout.strip() else None)
-
-
-def gate_in_process(argv, backend, stdin=""):
-    """Run gate.main with an injected backend; return (exit code, stdout)."""
-    out = io.StringIO()
-    old_stdin = sys.stdin
-    sys.stdin = io.StringIO(stdin)
-    try:
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-            rc = gate.main(argv, backend=backend)
-    finally:
-        sys.stdin = old_stdin
-    return rc, out.getvalue()
 
 
 class JsonMode(unittest.TestCase):
@@ -94,6 +73,8 @@ class LivePath(unittest.TestCase):
         self.assertEqual(m["verdict"], "GATE")
         self.assertEqual(m["instrument"]["failed_closed"], [])
         self.assertIn("external_comms", m["tools"][0]["capabilities"])
+        self.assertTrue(any("ADDED" in n for n in m["tools"][0]["notes"]),
+                        m["tools"][0]["notes"])
 
 
 if __name__ == "__main__":

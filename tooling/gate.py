@@ -148,18 +148,24 @@ def main(argv=None, backend=None):
             "       is a configuration failure, not a clean result.")
 
     # Reuse triage's own assessment -- one verdict function, not two.
-    a_ = T.assess(manifest)
+    assessment = T.assess(manifest)
     failed_closed = manifest["instrument"]["failed_closed"]
-    rc = verdict_code(a_, failed_closed, len(manifest["tools"]))
+    rc = verdict_code(assessment, failed_closed, len(manifest["tools"]))
 
     if a.json:
         # Machine-readable output must not turn the gate off: same verdict,
         # same exit code as the report.
-        manifest["verdict"] = {SHIP: a_["verdict"], GATE: "GATE", ERROR: "ERROR"}[rc]
+        manifest["verdict"] = ("ERROR" if rc == ERROR else
+                               "GATE" if failed_closed else assessment["verdict"])
         print(json.dumps(manifest, indent=2))
+        if rc == ERROR:
+            # stdout is a manifest; the failure must not live only inside it.
+            print("ERROR: every tool failed closed, so the classifier never ran.\n"
+                  "       This is a configuration failure, not a verdict.",
+                  file=sys.stderr)
         return rc
 
-    T.report(manifest, a_)
+    T.report(manifest, assessment)
     print_instrument(len(manifest["tools"]), bool(backend), classifier,
                      len(failed_closed))
 

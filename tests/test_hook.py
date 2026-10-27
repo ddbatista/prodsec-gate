@@ -8,7 +8,7 @@ import os
 import re
 import unittest
 
-from tests.test_contract import ROOT
+from tests.support import ROOT
 
 
 def hook_pattern():

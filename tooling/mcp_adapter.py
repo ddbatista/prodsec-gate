@@ -161,7 +161,9 @@ def classify(tool, backend):
         return set(), False
     if text is None:
         return set(), False
-    words = [line.strip().lower() for line in str(text).splitlines() if line.strip()]
+    # Case and trailing punctuation are not signal ("None." is still none).
+    words = [w for w in (line.strip().rstrip(".!").lower()
+                         for line in str(text).splitlines()) if w]
     found = {w for w in words if w in CAP_VOCAB}
     # "Found nothing" must be SAID, as `none`: an empty reply, a refusal and a
     # reply with no recognised token all look the same, so all are non-runs.

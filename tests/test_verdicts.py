@@ -8,9 +8,7 @@ import os
 import sys
 import unittest
 
-from tests.test_contract import GATE, SHIP, run
-
-FIXTURES = os.path.join("tests", "fixtures")
+from tests.support import FIXTURES, GATE, SHIP, VULNERABLE, run
 
 # (manifest under tooling/, expected exit code, expected VERDICT line)
 TRIAGE_VERDICTS = [
@@ -35,7 +33,7 @@ class FixtureVerdicts(unittest.TestCase):
 
     def test_vulnerable_dump_gates_with_exactly_1(self):
         # Not "non-zero": 2 would mean the check did not run.
-        p = run("gate", os.path.join("tooling", "mcp-dump.json"))
+        p = run("gate", VULNERABLE)
         self.assertEqual(p.returncode, GATE, p.stdout + p.stderr)
         self.assertIn("VERDICT: GATE", p.stdout)
 

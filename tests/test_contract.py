@@ -8,36 +8,15 @@ until then the README's "Exit codes are the interface" section is the source.
 """
 import os
 import re
-import shutil
 import subprocess
 import sys
-import tempfile
 import unittest
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOOLING = os.path.join(ROOT, "tooling")
+from tests.support import ERROR, FIXTURES, GATE, ROOT, SHIP, TOOLING, run
 
-SHIP, GATE, ERROR = 0, 1, 2
-
-
-# The auditors read ~/.claude etc. Point HOME at an empty directory so a
-# developer's real config can neither pass nor fail these tests.
-EMPTY_HOME = tempfile.mkdtemp(prefix="prodsec-home-")
-
-
-def tearDownModule():
-    shutil.rmtree(EMPTY_HOME, ignore_errors=True)
-MALFORMED = os.path.join("tests", "fixtures", "malformed-settings")
+MALFORMED = os.path.join(FIXTURES, "malformed-settings")
 # Valid JSON with the wrong shape: crashes rule handling inside both auditors.
-CRASHING = os.path.join("tests", "fixtures", "crashing-settings")
-
-
-def run(script, *args, stdin=""):
-    """Run tooling/<script>.py the way a CI job would; return the CompletedProcess."""
-    env = dict(os.environ, HOME=EMPTY_HOME)
-    return subprocess.run(
-        [sys.executable, os.path.join(TOOLING, script + ".py")] + list(args),
-        input=stdin, capture_output=True, text=True, cwd=ROOT, env=env, timeout=60)
+CRASHING = os.path.join(FIXTURES, "crashing-settings")
 
 
 def entry_point_modules():
