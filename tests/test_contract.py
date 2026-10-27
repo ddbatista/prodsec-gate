@@ -72,7 +72,9 @@ NOT_AUDITED = [
     ("gate", ["-"], '{"tools": []}', "no tools"),
     ("gate", ["-"], '{"agent": "x"}', "tools list"),
     ("gate", ["-"], '{"tools": [5]}', "internal error"),
-    ("gate", ["-"], "5", "internal error"),
+    ("gate", ["-"], "5", "tools list"),
+    ("gate", ["-", "--json"], "not json", "not JSON"),
+    ("gate", ["-", "--json"], '{"tools": []}', "no tools"),
 
     ("mcp_adapter", ["does-not-exist.json"], "", "does-not-exist.json"),
     ("mcp_adapter", ["-"], "", "pipefail"),

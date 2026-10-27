@@ -75,7 +75,7 @@ GATE**. Add `--live` to have an LLM classify the descriptions as well; see
 
 ```sh
 prodsec-gate tooling/mcp-dump.json            # → GATE (full trifecta), exit 1
-prodsec-gate tooling/mcp-dump.json --json     # show the inferred manifest instead
+prodsec-gate tooling/mcp-dump.json --json     # same verdict and exit code, as JSON with the manifest
 ```
 
 **Grade a hand-written agent manifest.** The schema is in

@@ -1,0 +1,6 @@
+{"tools": [
+  {"name": "get_time", "description": "Returns the current time in UTC.",
+   "annotations": {"readOnlyHint": true, "openWorldHint": false}},
+  {"name": "add_numbers", "description": "Adds two numbers together.",
+   "annotations": {"readOnlyHint": true, "openWorldHint": false}}
+]}

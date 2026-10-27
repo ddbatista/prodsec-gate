@@ -195,38 +195,67 @@ def infer_signalled(tool, backend=None):
                      % ", ".join(sorted(dropped)))
     return caps | extra, reversible, notes, True
 
-def adapt(dump):
+# The keyword floor's measured recall on the 12-tool labelled corpus
+# (tooling/corpus.json, eval_adapter.py). Carried in every manifest's
+# instrument block: a verdict without its denominator is unattributable.
+FLOOR_RECALL = "62.5%"
+
+
+def tools_of(dump):
+    """The tool list from any of the three dump shapes. The only parser.
+
+    Accepts a full tools/list JSON-RPC response ({"result": {"tools": [...]}}),
+    a bare {"tools": [...]}, or a bare [...] array.
+    """
     if isinstance(dump, list):
-        tools = dump
-    elif "tools" in dump:
-        tools = dump["tools"]
-    elif "result" in dump and "tools" in dump["result"]:
-        tools = dump["result"]["tools"]
-    else:
-        raise ValueError("could not find a tools list in input")
+        return dump
+    if isinstance(dump, dict):
+        if "tools" in dump:
+            return dump["tools"]
+        if isinstance(dump.get("result"), dict) and "tools" in dump["result"]:
+            return dump["result"]["tools"]
+    raise ValueError("could not find a tools list in input")
 
-    out_tools, warnings = [], []
-    for t in tools:
-        caps, reversible, notes = infer(t)
-        entry = {
-            "name": t.get("name", "<unnamed>"),
-            "description": t.get("description", ""),
+
+def build_manifest(dump, backend=None, name="mcp-server", classifier=None,
+                   progress=False):
+    """Dump -> triage manifest, with the instrument that produced it.
+
+    backend is the optional classifier (see infer_signalled); classifier is its
+    name for the instrument block. Raises ValueError when there is no tools list.
+    """
+    raw = tools_of(dump)
+    tools, failed_closed = [], []
+    for i, t in enumerate(raw, 1):
+        # The agent-sdk backend spawns a Claude Code CLI subprocess per tool,
+        # ~3.5s each, serially. Three tools is 11 seconds of silence; a 40-tool
+        # server is two minutes of it. Found 2026-09-21 when a run that had not
+        # hung was reasonably assumed to have hung. A gate that looks dead gets
+        # killed, and a killed gate teaches people to stop running it.
+        if progress:
+            print("  [%d/%d] classifying %s ..." % (i, len(raw), t.get("name", "?")),
+                  file=sys.stderr, flush=True)
+        caps, reversible, notes, ok = infer_signalled(t, backend)
+        if not ok:
+            failed_closed.append(t.get("name", "?"))
+        tools.append({
+            "name": t.get("name", "?"),
+            "description": (t.get("description") or "")[:200],
             "capabilities": sorted(caps),
-        }
-        if reversible is not None:
-            entry["reversible"] = reversible
-        out_tools.append(entry)
-        for n in notes:
-            warnings.append("%s: %s" % (entry["name"], n))
-
-    manifest = {
-        "agent": dump.get("agent", "mcp-server") if isinstance(dump, dict) else "mcp-server",
-        "description": "Inferred from MCP tools/list. REVIEW — inference is lossy.",
-        "autonomous": True,
+            "reversible": True if reversible is None else reversible,
+            "notes": notes,
+        })
+    return {
+        "agent": name,
         "human_in_loop": False,
-        "tools": out_tools,
+        "tools": tools,
+        "instrument": {
+            "classifier": classifier if backend else None,
+            "floor_recall_on_corpus": FLOOR_RECALL,
+            "failed_closed": failed_closed,
+            "basis": "declarations",
+        },
     }
-    return manifest, warnings
 
 
 @_cli.entrypoint
@@ -236,15 +265,13 @@ def main(argv=None):
         print(__doc__)
         return _cli.SHIP if argv else _cli.ERROR
     try:
-        manifest, warnings = adapt(_cli.read_json(argv[0]))
+        manifest = build_manifest(_cli.read_json(argv[0]))
     except ValueError as e:
         raise _cli.NotAudited(str(e))
     # No finding state here, so the only honest codes are "produced a
     # manifest" (0) and "did not" (2). An empty one is the latter.
     if not manifest["tools"]:
         raise _cli.NotAudited("the dump contains no tools. Nothing was audited.")
-    for w in warnings:
-        sys.stderr.write("INFER: %s\n" % w)
     print(json.dumps(manifest, indent=2, ensure_ascii=False))
     return _cli.SHIP
 
