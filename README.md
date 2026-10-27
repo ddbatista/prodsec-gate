@@ -71,7 +71,9 @@ records but never uses an egress keyword, so it grades **SHIP when it should
 GATE**. Add `--live` to have an LLM classify the descriptions as well; see
 [docs/prodsec-gate.md](docs/prodsec-gate.md).
 
-**Grade an MCP dump you already have:**
+**Grade an MCP dump you already have.** If you commit dumps, name them
+`<server>.tools.json` so the [pre-commit hook](docs/packaging-and-ci.md) picks
+them up:
 
 ```sh
 prodsec-gate tooling/mcp-dump.json            # → GATE (full trifecta), exit 1
