@@ -1,0 +1,24 @@
+;; macOS sandbox for running a third-party MCP server just long enough to
+;; answer tools/list. Used by corpus/capture.py; see corpus/README.md.
+;;
+;;   no network at all      a server cannot phone home or exfiltrate
+;;   no reads under $HOME   except the runtime it needs (RUNTIME)
+;;   writes only in WORK    the throwaway install directory
+;;
+;; In SBPL the last matching rule wins, so each allow below narrows a deny.
+(version 1)
+(allow default)
+
+(deny network*)
+
+(deny file-read* (subpath (param "HOME")))
+(allow file-read*
+  (subpath (param "WORK"))
+  (subpath (param "RUNTIME")))
+
+(deny file-write*)
+(allow file-write*
+  (subpath (param "WORK"))
+  (literal "/dev/null")
+  (literal "/dev/tty")
+  (regex #"^/dev/fd/"))

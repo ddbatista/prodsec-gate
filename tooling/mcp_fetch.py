@@ -26,9 +26,12 @@ Wire format (stdio): newline-delimited JSON-RPC.
 import argparse
 import json
 import os
+import queue
 import re
 import subprocess
 import sys
+import threading
+import time
 import urllib.error
 import urllib.request
 
@@ -64,26 +67,73 @@ def _msgs():
 
 
 def fetch_stdio(command, timeout=30):
+    """Talk to the server one request at a time, keeping stdin open until the
+    last answer. Writing everything and closing stdin is not enough: the
+    Python MCP SDK shuts down on EOF and drops the request still in flight.
+    Follows tools/list pagination (nextCursor)."""
     init, ready, listing = _msgs()
-    payload = "".join(json.dumps(m) + "\n" for m in (init, ready, listing))
     p = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE, text=True)
+    lines, err = queue.Queue(), []
+    threading.Thread(target=lambda: [lines.put(x) for x in p.stdout] + [lines.put(None)],
+                     daemon=True).start()
+    threading.Thread(target=lambda: err.extend(p.stderr), daemon=True).start()
+    deadline = time.monotonic() + timeout
+
+    def send(msg):
+        p.stdin.write(json.dumps(msg) + "\n")
+        p.stdin.flush()
+
+    def answer(want):
+        while True:
+            try:
+                line = lines.get(timeout=max(0.0, deadline - time.monotonic()))
+            except queue.Empty:
+                raise RuntimeError("server did not answer within %ds" % timeout)
+            if line is None:
+                time.sleep(0.1)           # let stderr drain for the message
+                raise RuntimeError("no tools/list response.\nstderr: %s"
+                                   % "".join(err)[:400])
+            try:
+                msg = json.loads(line)
+            except json.JSONDecodeError:
+                continue                  # servers log to stdout; skip noise
+            if isinstance(msg, dict) and msg.get("id") == want:
+                if "result" not in msg:
+                    raise RuntimeError("server answered with an error: %s"
+                                       % json.dumps(msg.get("error"))[:400])
+                return msg
+
     try:
-        out, err = p.communicate(payload, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        p.kill()
-        raise RuntimeError("server did not answer within %ds" % timeout)
-    for line in out.splitlines():
-        line = line.strip()
-        if not line:
-            continue
+        send(init)
+        answer(init["id"])
+        send(ready)
+        send(listing)
+        first = answer(listing["id"])
+        tools = list(first["result"].get("tools", []))
+        cursor, n = first["result"].get("nextCursor"), listing["id"]
+        while cursor:
+            n += 1
+            send({"jsonrpc": "2.0", "id": n, "method": "tools/list",
+                  "params": {"cursor": cursor}})
+            page = answer(n)["result"]
+            tools += page.get("tools", [])
+            cursor = page.get("nextCursor")
+    except (BrokenPipeError, OSError) as e:
+        raise RuntimeError("server exited early (%s).\nstderr: %s"
+                           % (e, "".join(err)[:400]))
+    finally:
         try:
-            msg = json.loads(line)
-        except json.JSONDecodeError:
-            continue                      # servers log to stdout; skip noise
-        if msg.get("id") == 2 and "result" in msg:
-            return msg
-    raise RuntimeError("no tools/list response.\nstderr: %s" % (err or "")[:400])
+            p.stdin.close()
+        except OSError:
+            pass
+        try:
+            p.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            p.kill()
+    first["result"]["tools"] = tools
+    first["result"].pop("nextCursor", None)
+    return first
 
 
 def fetch_http(url, headers=None, timeout=30):

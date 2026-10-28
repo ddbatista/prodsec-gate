@@ -1,0 +1,31 @@
+[
+  {
+    "server": "filesystem",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-filesystem",
+    "version": "2.0.1",
+    "licence": "MIT AND Apache-2.0",
+    "args": [
+      "{ROOT}"
+    ],
+    "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
+    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/main/LICENSE"
+  },
+  {
+    "server": "memory",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-memory",
+    "version": "2.0.0",
+    "licence": "MIT AND Apache-2.0",
+    "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/memory",
+    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/main/LICENSE"
+  },
+  {
+    "server": "time",
+    "registry": "pypi",
+    "package": "mcp-server-time",
+    "version": "2026.10.19",
+    "module": "mcp_server_time",
+    "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/time"
+  }
+]

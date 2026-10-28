@@ -4,6 +4,7 @@ The self-test tables live in each tool and are not copied here: running
 `--self-test` exercises the same rows a user runs, and a failing row fails
 the suite because every self-test exits non-zero on any failure.
 """
+import json
 import os
 import sys
 import unittest
@@ -47,6 +48,15 @@ class FixtureVerdicts(unittest.TestCase):
         p = run("gate", "-", stdin=fetched.stdout)
         self.assertEqual(p.returncode, SHIP, p.stdout + p.stderr)
         self.assertIn("relay_to_partner", p.stdout + fetched.stdout)
+
+    def test_fetch_waits_for_a_server_that_stops_on_eof_and_follows_pages(self):
+        # The Python MCP SDK drops an in-flight request when stdin closes, so a
+        # client that writes everything and hangs up gets nothing back.
+        fetched = run("mcp_fetch", "--i-will-execute-this", "--stdio", sys.executable,
+                      os.path.join(FIXTURES, "eof_sensitive_server.py"))
+        self.assertEqual(fetched.returncode, SHIP, fetched.stderr)
+        names = [t["name"] for t in json.loads(fetched.stdout)["result"]["tools"]]
+        self.assertEqual(names, ["page_one", "page_two"])
 
 
 class SelfTests(unittest.TestCase):
