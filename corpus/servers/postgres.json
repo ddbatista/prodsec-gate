@@ -1,0 +1,40 @@
+{
+  "server": "postgres",
+  "package": "@modelcontextprotocol/server-postgres",
+  "registry": "npm",
+  "version": "0.6.2",
+  "source": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/postgres",
+  "licence": "MIT",
+  "captured": "2026-10-27",
+  "capture_method": "sandboxed-stdio",
+  "capture_args": [
+    "postgresql://localhost/dummy"
+  ],
+  "notes": "deprecated on npm",
+  "tools": [
+    {
+      "name": "query",
+      "description": "Run a read-only SQL query",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sql": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "labels": {
+    "query": {
+      "capabilities": [
+        "untrusted_input",
+        "private_data"
+      ],
+      "reversible": null,
+      "why": "runs read-only SQL and returns rows, which can hold text the application's users wrote"
+    }
+  },
+  "expected_verdict": "SHIP",
+  "rationale": "One read-only query tool: private rows, some of them written by the application's users, but no way to change or send anything."
+}

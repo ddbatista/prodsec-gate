@@ -21,6 +21,7 @@ See docs/design-notes.md#rigged-eval-disclosed.
 """
 import argparse
 import glob
+import hashlib
 import importlib.util
 import json
 import math
@@ -208,6 +209,16 @@ def load_servers(directory):
     return servers
 
 
+def fingerprint(servers):
+    """What the recall baseline was measured on: every server's tools, labels
+    and expected verdict. Provenance (capture date and so on) is left out, so
+    a re-capture that changes nothing keeps the baseline."""
+    body = [{"server": fx["server"], "tools": fx["tools"], "labels": fx["labels"],
+             "expected_verdict": fx["expected_verdict"]}
+            for fx in sorted(servers, key=lambda fx: fx["server"])]
+    return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
+
+
 def _verdict(tools):
     m = {"human_in_loop": False,
          "tools": [{"name": n, "capabilities": sorted(caps),
@@ -231,7 +242,7 @@ def corpus_metrics(servers, infer=None):
     """
     infer = infer or A.infer
     caps = {c: {"tp": 0, "fp": 0, "fn": 0} for c in A.CAP_VOCAB}
-    misses, mismatches = [], []
+    misses, mismatches, disputes = [], [], []
     gated = acceptable = 0
     for fx in servers:
         derived, oracle = [], []
@@ -255,12 +266,14 @@ def corpus_metrics(servers, infer=None):
         if want == "SHIP":
             acceptable += 1
             gated += d == "GATE"
+        if o != want:
+            disputes.append(fx["server"])
         if d != want:
             mismatches.append({"server": fx["server"], "expected": want, "derived": d,
                                "oracle": o, "kind": "detection" if o == want else "policy"})
     overall = {k: sum(c[k] for c in caps.values()) for k in ("tp", "fp", "fn")}
     return {"capabilities": caps, "overall": overall, "misses": misses,
-            "mismatches": mismatches,
+            "mismatches": mismatches, "policy_disputes": disputes,
             "gate_rate": {"gated": gated, "acceptable": acceptable},
             "servers": len(servers),
             "tools": sum(len(A.tools_of(fx["tools"])) for fx in servers)}
@@ -293,6 +306,12 @@ def report_corpus(m):
               % (x["kind"], x["server"], x["expected"], x["derived"], x["oracle"]))
     if not m["mismatches"]:
         print("  MISMATCH none: every derived verdict matches its label")
+    hidden = [s for s in m["policy_disputes"]
+              if s not in {x["server"] for x in m["mismatches"]}]
+    for server in hidden:
+        print("  POLICY   %-28s the labelled legs disagree with the expected verdict;"
+              % server)
+        print("           %-28s derived matches only because detection missed legs" % "")
     for server, tool, legs in m["misses"]:
         print("  MISS     %-28s %-24s %s" % (server, tool, ", ".join(legs)))
     print("=" * 74)
@@ -321,6 +340,7 @@ def main():
             legs = dict(m["capabilities"], overall=m["overall"])
             with open(a.write_baseline, "w") as f:
                 json.dump({"servers": m["servers"], "tools": m["tools"],
+                           "corpus_sha256": fingerprint(servers),
                            "floor_recall": {k: {"tp": c["tp"], "n": c["tp"] + c["fn"]}
                                             for k, c in legs.items()}},
                           f, indent=2)

@@ -128,6 +128,11 @@ class Metrics(unittest.TestCase):
                                  "b-policy": "policy",
                                  "c-missed": "detection"})
 
+    def test_policy_disputes_are_listed_even_when_detection_hides_them(self):
+        # Wherever the labelled legs alone disagree with the expected verdict,
+        # whatever the detector derived: a miss can make a dispute look settled.
+        self.assertEqual(self.m["policy_disputes"], ["b-policy"])
+
     def test_misses_name_the_tool(self):
         self.assertEqual(self.m["misses"], [("c-missed", "t4", ["state_change"])])
 
@@ -146,6 +151,24 @@ class Ratchet(unittest.TestCase):
                     "recall on %s dropped below the committed baseline %d/%d; "
                     "a pattern change may not buy precision with missed GATEs"
                     % (leg, base["tp"], base["n"]))
+
+    def test_baseline_was_measured_on_this_corpus(self):
+        # Recall on a different corpus is a different number. A changed corpus
+        # needs a regenerated baseline, reviewed as a diff, not a silent pass.
+        self.assertEqual(
+            json.load(open(BASELINE))["corpus_sha256"],
+            E.fingerprint(E.load_servers(CORPUS)),
+            "the corpus changed since the baseline was written; run "
+            "eval_adapter.py --servers corpus/servers --write-baseline "
+            "corpus/baseline.json and review the diff")
+
+    def test_fingerprint_ignores_provenance_but_not_labels(self):
+        servers = E.load_servers(MINI)
+        before = E.fingerprint(servers)
+        servers[0]["captured"] = "2030-01-01"
+        self.assertEqual(E.fingerprint(servers), before)
+        servers[0]["labels"]["t1"]["capabilities"] = []
+        self.assertNotEqual(E.fingerprint(servers), before)
 
     def test_baseline_covers_every_leg(self):
         baseline = json.load(open(BASELINE))["floor_recall"]

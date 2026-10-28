@@ -147,7 +147,14 @@ def capture(src):
                         "-D", "HOME=" + os.path.realpath(os.path.expanduser("~")),
                         "-D", "WORK=" + work, "-D", "RUNTIME=" + runtime]
                      + cmd + args)
-        dump = mcp_fetch.fetch_stdio(sandboxed, timeout=src.get("timeout", 60))
+        # Start inside WORK: the sandbox denies reads under $HOME, and a server
+        # whose working directory it cannot read dies before it answers.
+        cwd = os.getcwd()
+        os.chdir(work)
+        try:
+            dump = mcp_fetch.fetch_stdio(sandboxed, timeout=src.get("timeout", 60))
+        finally:
+            os.chdir(cwd)
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -192,6 +199,7 @@ def main(argv=None):
         raise _cli.NotAudited("not in sources.json: %s" % ", ".join(sorted(unknown)))
     failed = 0
     for src in chosen:
+        sys.stdout.flush()
         try:
             fx = capture(src)
             missing = len(fx["tools"]) - len(fx["labels"])

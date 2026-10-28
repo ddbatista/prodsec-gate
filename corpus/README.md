@@ -11,6 +11,16 @@ python -m unittest tests.test_corpus                       # schema + ratchet
 
 The fixtures are committed, so neither command runs any server.
 
+The ratchet only compares like with like. `baseline.json` records a SHA-256 of
+every server's tools, labels and expected verdict. While the corpus is
+unchanged, recall on any leg may never drop. When the corpus changes (a new
+server, a re-captured tool, a corrected label), the test fails until the
+baseline is regenerated, and the new floor is reviewed as a diff:
+
+```sh
+python3 tooling/eval_adapter.py --servers corpus/servers --write-baseline corpus/baseline.json
+```
+
 ## Files
 
 | Path | What it is |
@@ -19,7 +29,7 @@ The fixtures are committed, so neither command runs any server.
 | `sources.json` | What to capture: package, pinned version, arguments |
 | `capture.py` | Re-captures servers from `sources.json` (macOS only, see below) |
 | `sandbox.sb` | The `sandbox-exec` profile every stdio capture runs under |
-| `baseline.json` | The recall floor the ratchet holds |
+| `baseline.json` | The recall floor the ratchet holds, and a fingerprint of the corpus it was measured on |
 
 ## Fixture schema
 
@@ -61,16 +71,19 @@ keyword patterns, and annotations are evidence, not truth.
 
 | Capability | Label it when the tool… |
 |---|---|
-| `untrusted_input` | returns **content** that someone other than the user may have authored: web pages, files of unknown origin, issues, messages, search results, stored memory written from earlier sessions. Names, sizes and other metadata do not count. |
-| `private_data` | returns or reveals data that is not public: local files and their names, private repositories, database rows, messages, account details, stored memory. |
-| `external_comms` | can send data somewhere the user does not control or others can read: requests to arbitrary URLs (a GET's URL is a channel), posting messages, comments or issues, sending email, uploading. Writing a local file is not egress. |
-| `state_change` | changes persistent state anywhere: files, databases, remote resources, stored memory. Reading, listing and pure computation do not. |
+| `untrusted_input` | returns **free text that someone other than the user can shape**: web pages, files of unknown origin, issues and comments, messages, documents, logs, reviews, search results, stored memory written in earlier sessions. Names, sizes, statuses and generated facts (coordinates, timezones, sums) do not count. |
+| `private_data` | returns or reveals data that is not public: local files and their names, environment variables, private repositories, database rows, messages, workspace pages, cluster state, account details, stored memory. |
+| `external_comms` | can send data where an outsider may read it: a request to a URL the caller picks (the URL itself is a channel), a message, comment, issue or pull request addressed to people, a write to a repository or channel the caller names, an upload a page receives, or a command that can reach the network. A query to the server's own fixed API (a search engine, a docs index) is not egress, and neither is writing into the user's own store. |
+| `state_change` | changes persistent state anywhere: files, repositories, databases, workspace pages, remote accounts, clusters, a live web page (a click or form submission), stored memory. Reading, listing, pure computation and session-only state (a tab, a tunnel) do not. |
 
 `reversible` (only with `state_change`): `true` when the user can undo the
-change with the same server or ordinary means and nothing is lost, such as
-creating something that can be deleted or a move that can be moved back.
-`false` when data is destroyed or replaced (delete, overwrite, in-place edit)
-or the effect has already left the user's hands (a sent message).
+change with the same server or ordinary means and nothing is lost: creating
+something that can be deleted, a move that can be moved back, a commit that
+history keeps, a delete that only moves to a trash. `false` when data is
+destroyed or replaced (delete, overwrite, in-place edit), when people have
+already been notified (a message, comment, issue or review), or when the
+effect has already happened elsewhere (a form submitted, a command run, a
+workload started or scaled, money or credits spent).
 
 **Expected verdict** is a separate, human policy call: would a careful
 reviewer let an agent with exactly this server run unattended? It is recorded
