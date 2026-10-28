@@ -20,6 +20,8 @@ model. --live is the real thing, and MAESTRO layer 1 stays EMPTY until you run i
 See docs/design-notes.md#rigged-eval-disclosed.
 """
 import argparse
+import glob
+import hashlib
 import importlib.util
 import json
 import math
@@ -27,6 +29,9 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+import _cli                      # noqa: E402
 
 
 def _load(path, name):
@@ -37,6 +42,7 @@ def _load(path, name):
 
 
 A = _load(os.path.join(HERE, "mcp_adapter.py"), "mcp_adapter")
+T = _load(os.path.join(HERE, "triage.py"), "triage")
 
 SEMANTIC = {
     "external_comms": ("forward", "relay", "partner", "endpoint", "third-party",
@@ -114,11 +120,251 @@ def report(label, corpus, backend):
     return rec
 
 
-def main():
+# ===========================================================================
+# The real-server corpus (corpus/servers/*.json, schema in corpus/README.md).
+#
+# Ground truth is per tool: its capabilities and, for a state change, whether
+# it can be undone. The server's expected verdict is a separate, human policy
+# label. The derived verdict comes from running triage on what the detector
+# inferred; the "oracle" verdict from running triage on the labels themselves.
+# When derived and expected disagree, the oracle says whose problem it is:
+#   detection  the oracle agrees with the label, so the legs were wrong
+#   policy     the oracle disagrees too, and the legs were right: a disputed
+#              verdict, not a detection bug
+#   both       the oracle disagrees AND some legs were wrong: fix the legs,
+#              and the verdict is still a policy question
+# A policy question is never fixed by weakening a pattern.
+
+PERMISSIVE = {"MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC",
+              "0BSD", "Unlicense", "CC0-1.0"}
+CAPTURE_METHODS = {"sandboxed-stdio", "remote-http"}
+PROVENANCE = ("server", "package", "registry", "version", "source", "licence",
+              "captured", "capture_method")
+VERDICTS = {"SHIP", "GATE"}
+
+
+def licence_ok(expr):
+    """True when every licence an SPDX expression names is permissive. An OR
+    is not taken as a choice: the corpus commits text under every licence it
+    names, so all of them must allow that."""
+    ids = licence_ids(expr)
+    return bool(ids) and all(i in PERMISSIVE for i in ids)
+
+
+def licence_ids(expr):
+    """The licence ids an SPDX expression names, operators and brackets dropped."""
+    words = str(expr or "").replace("(", " ").replace(")", " ").split()
+    return [w for w in words if w not in ("AND", "OR", "WITH")]
+
+
+def problems(fx):
+    """Everything wrong with one server fixture; [] means valid."""
+    out = []
+    for field in PROVENANCE:
+        if not str(fx.get(field) or "").strip():
+            out.append("missing %s" % field)
+    if fx.get("licence") and not licence_ok(fx["licence"]):
+        out.append("licence %r is not on the permissive list" % fx["licence"])
+    if fx.get("capture_method") and fx["capture_method"] not in CAPTURE_METHODS:
+        out.append("capture_method %r is not one of %s"
+                   % (fx["capture_method"], sorted(CAPTURE_METHODS)))
+    if fx.get("expected_verdict") not in VERDICTS:
+        out.append("expected_verdict must be SHIP or GATE")
+    if not str(fx.get("rationale") or "").strip():
+        out.append("missing rationale for the expected verdict")
+    try:
+        names = [t["name"] for t in A.tools_of(fx.get("tools"))]
+    except (ValueError, KeyError, TypeError):
+        return out + ["no captured tool list"]
+    if not names:
+        out.append("no captured tools")
+    labels = fx.get("labels") or {}
+    for n in sorted(set(names) - set(labels)):
+        out.append("tool %s has no label" % n)
+    for n in sorted(set(labels) - set(names)):
+        out.append("label %s names a tool that was not captured" % n)
+    for n, lab in sorted(labels.items()):
+        caps = lab.get("capabilities")
+        if not isinstance(caps, list) or set(caps) - set(A.CAP_VOCAB):
+            out.append("%s: capabilities must be drawn from %s" % (n, ", ".join(A.CAP_VOCAB)))
+            continue
+        rev = lab.get("reversible")
+        if "state_change" in caps and not isinstance(rev, bool):
+            out.append("%s: a state_change label needs reversible true/false" % n)
+        if "state_change" not in caps and rev is not None:
+            out.append("%s: reversible is only for state_change tools" % n)
+        if not str(lab.get("why") or "").strip():
+            out.append("%s: missing why" % n)
+    return out
+
+
+def load_servers(directory):
+    """Every *.json fixture in directory, validated. Raises ValueError listing
+    every problem in every file, so a bad corpus is never scored."""
+    paths = sorted(glob.glob(os.path.join(directory, "*.json")))
+    if not paths:
+        raise ValueError("no server fixtures in %s" % directory)
+    servers, bad = [], []
+    for p in paths:
+        try:
+            with open(p, encoding="utf-8") as f:
+                fx = json.load(f)
+        except (OSError, ValueError) as e:
+            bad.append("%s: %s" % (os.path.basename(p), e))
+            continue
+        errs = problems(fx) if isinstance(fx, dict) else ["not a JSON object"]
+        bad += ["%s: %s" % (os.path.basename(p), e) for e in errs]
+        servers.append(fx)
+    if bad:
+        raise ValueError("invalid corpus:\n  " + "\n  ".join(bad))
+    return servers
+
+
+def fingerprint(servers):
+    """What the recall baseline was measured on: every server's tools, labels
+    and expected verdict. Provenance (capture date and so on) is left out, so
+    a re-capture that changes nothing keeps the baseline."""
+    body = [{"server": fx["server"], "tools": fx["tools"], "labels": fx["labels"],
+             "expected_verdict": fx["expected_verdict"]}
+            for fx in sorted(servers, key=lambda fx: fx["server"])]
+    return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
+
+
+def _verdict(tools):
+    m = {"human_in_loop": False,
+         "tools": [{"name": n, "capabilities": sorted(caps),
+                    "reversible": True if rev is None else rev}
+                   for n, caps, rev in tools]}
+    return T.assess(m)["verdict"]
+
+
+def recall(c):
+    return c["tp"] / (c["tp"] + c["fn"]) if c["tp"] + c["fn"] else 1.0
+
+
+def precision(c):
+    return c["tp"] / (c["tp"] + c["fp"]) if c["tp"] + c["fp"] else 1.0
+
+
+def corpus_metrics(servers, infer=None):
+    """Score a detector (default: the keyword floor) against the labels.
+
+    infer(tool) -> (capabilities, reversible, notes), the shape of A.infer.
+    """
+    infer = infer or A.infer
+    caps = {c: {"tp": 0, "fp": 0, "fn": 0} for c in A.CAP_VOCAB}
+    misses, mismatches, disputes = [], [], []
+    gated = acceptable = 0
+    for fx in servers:
+        derived, oracle, legs_wrong = [], [], False
+        for tool in A.tools_of(fx["tools"]):
+            lab = fx["labels"][tool["name"]]
+            truth = set(lab["capabilities"])
+            got, rev, _ = infer(tool)
+            got = {c for c in got if c in A.CAP_VOCAB}
+            for c in A.CAP_VOCAB:
+                if c in got and c in truth:
+                    caps[c]["tp"] += 1
+                elif c in got:
+                    caps[c]["fp"] += 1
+                elif c in truth:
+                    caps[c]["fn"] += 1
+            if truth - got:
+                misses.append((fx["server"], tool["name"], sorted(truth - got)))
+            derived_rev = rev if "state_change" in got else None
+            if got != truth or ("state_change" in truth and
+                                (True if derived_rev is None else derived_rev)
+                                != lab["reversible"]):
+                legs_wrong = True
+            derived.append((tool["name"], got, derived_rev))
+            oracle.append((tool["name"], truth, lab["reversible"]))
+        d, o, want = _verdict(derived), _verdict(oracle), fx["expected_verdict"]
+        if want == "SHIP":
+            acceptable += 1
+            gated += d == "GATE"
+        if o != want:
+            disputes.append(fx["server"])
+        if d != want:
+            kind = "detection" if o == want else "both" if legs_wrong else "policy"
+            mismatches.append({"server": fx["server"], "expected": want, "derived": d,
+                               "oracle": o, "kind": kind})
+    overall = {k: sum(c[k] for c in caps.values()) for k in ("tp", "fp", "fn")}
+    return {"capabilities": caps, "overall": overall, "misses": misses,
+            "mismatches": mismatches, "policy_disputes": disputes,
+            "gate_rate": {"gated": gated, "acceptable": acceptable},
+            "servers": len(servers),
+            "tools": sum(len(A.tools_of(fx["tools"])) for fx in servers)}
+
+
+def _rate(k, n):
+    if not n:
+        return "%3d/%-3d =   n/a" % (k, n)
+    lo, hi = wilson(k, n)
+    return "%3d/%-3d = %5.1f%%  [%5.1f–%5.1f%%]" % (k, n, 100 * k / n,
+                                                   lo * 100, hi * 100)
+
+
+def report_corpus(m):
+    print("=" * 74)
+    print(" REAL-SERVER CORPUS · %d servers · %d tools · keyword floor"
+          % (m["servers"], m["tools"]))
+    print("=" * 74)
+    print("  %-16s %-34s %s" % ("leg", "recall", "precision"))
+    for name, c in list(m["capabilities"].items()) + [("overall", m["overall"])]:
+        print("  %-16s %-34s %s" % (name, _rate(c["tp"], c["tp"] + c["fn"]),
+                                     _rate(c["tp"], c["tp"] + c["fp"])))
+    print("\n  missed legs are missed GATEs; false legs cost a human a second look")
+    g = m["gate_rate"]
+    print("\n  GATE rate on acceptable servers  %s" % _rate(g["gated"], g["acceptable"]))
+    print("    (servers labelled SHIP that the gate would block)")
+    print()
+    for x in m["mismatches"]:
+        print("  MISMATCH %-9s %-28s expected %s, derived %s, labels give %s"
+              % (x["kind"], x["server"], x["expected"], x["derived"], x["oracle"]))
+    if not m["mismatches"]:
+        print("  MISMATCH none: every derived verdict matches its label")
+    hidden = [s for s in m["policy_disputes"]
+              if s not in {x["server"] for x in m["mismatches"]}]
+    for server in hidden:
+        print("  POLICY   %-28s the labelled legs disagree with the expected verdict;"
+              % server)
+        print("           %-28s derived matches only because detection missed legs" % "")
+    for server, tool, legs in m["misses"]:
+        print("  MISS     %-28s %-24s %s" % (server, tool, ", ".join(legs)))
+    print("=" * 74)
+
+
+@_cli.entrypoint
+def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--live", action="store_true")
     ap.add_argument("--corpus", default=os.path.join(HERE, "corpus.json"))
-    a = ap.parse_args()
+    ap.add_argument("--servers", metavar="DIR",
+                    help="score the keyword floor on a real-server corpus "
+                         "(corpus/servers) instead of the hand-written one")
+    ap.add_argument("--write-baseline", metavar="FILE",
+                    help="with --servers: record today's recall as the floor the "
+                         "ratchet holds (review the diff: it must not go down)")
+    a = ap.parse_args(argv)
+    if a.write_baseline and not a.servers:
+        raise _cli.NotAudited("--write-baseline needs --servers DIR")
+    if a.servers:
+        try:
+            servers = load_servers(a.servers)
+        except ValueError as e:
+            raise _cli.NotAudited(str(e))
+        m = corpus_metrics(servers)
+        report_corpus(m)
+        if a.write_baseline:
+            legs = dict(m["capabilities"], overall=m["overall"])
+            with open(a.write_baseline, "w") as f:
+                json.dump({"servers": m["servers"], "tools": m["tools"],
+                           "corpus_sha256": fingerprint(servers),
+                           "floor_recall": {k: {"tp": c["tp"], "n": c["tp"] + c["fn"]}
+                                            for k, c in legs.items()}},
+                          f, indent=2)
+                f.write("\n")
+        return 0
     corpus = json.load(open(a.corpus))
 
     print("=" * 74)

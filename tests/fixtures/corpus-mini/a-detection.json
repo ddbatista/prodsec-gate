@@ -1,0 +1,38 @@
+{
+  "server": "a-detection",
+  "package": "example-a-detection",
+  "registry": "npm",
+  "version": "1.0.0",
+  "source": "https://example.invalid/repo",
+  "licence": "MIT",
+  "captured": "2026-10-27",
+  "capture_method": "sandboxed-stdio",
+  "tools": [
+    {
+      "name": "t1",
+      "description": "synthetic"
+    },
+    {
+      "name": "t2",
+      "description": "synthetic"
+    }
+  ],
+  "labels": {
+    "t1": {
+      "capabilities": [
+        "private_data"
+      ],
+      "reversible": null,
+      "why": "synthetic"
+    },
+    "t2": {
+      "capabilities": [
+        "state_change"
+      ],
+      "reversible": true,
+      "why": "synthetic"
+    }
+  },
+  "expected_verdict": "SHIP",
+  "rationale": "synthetic fixture for the eval's own tests"
+}

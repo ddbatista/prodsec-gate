@@ -1,0 +1,27 @@
+{
+  "servers": 20,
+  "tools": 222,
+  "corpus_sha256": "6445bf826eacc2ffd7d6e039e5a0e98e8e2cef81b17faa983c16ac29be1acb3a",
+  "floor_recall": {
+    "untrusted_input": {
+      "tp": 84,
+      "n": 99
+    },
+    "private_data": {
+      "tp": 29,
+      "n": 74
+    },
+    "external_comms": {
+      "tp": 18,
+      "n": 48
+    },
+    "state_change": {
+      "tp": 42,
+      "n": 82
+    },
+    "overall": {
+      "tp": 173,
+      "n": 303
+    }
+  }
+}

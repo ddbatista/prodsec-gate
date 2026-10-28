@@ -1,0 +1,152 @@
+{
+  "server": "gitlab",
+  "package": "@modelcontextprotocol/server-gitlab",
+  "registry": "npm",
+  "version": "2025.4.25",
+  "source": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/gitlab",
+  "licence": "MIT",
+  "captured": "2026-10-27",
+  "capture_method": "sandboxed-stdio",
+  "capture_args": [],
+  "notes": "deprecated on npm",
+  "tools": [
+    {
+      "name": "create_or_update_file",
+      "description": "Create or update a single file in a GitLab project",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "search_repositories",
+      "description": "Search for GitLab projects",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "create_repository",
+      "description": "Create a new GitLab project",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_file_contents",
+      "description": "Get the contents of a file or directory from a GitLab project",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "push_files",
+      "description": "Push multiple files to a GitLab project in a single commit",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "create_issue",
+      "description": "Create a new issue in a GitLab project",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "create_merge_request",
+      "description": "Create a new merge request in a GitLab project",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "fork_repository",
+      "description": "Fork a GitLab project to your account or specified namespace",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "create_branch",
+      "description": "Create a new branch in a GitLab project",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    }
+  ],
+  "labels": {
+    "create_or_update_file": {
+      "capabilities": [
+        "external_comms",
+        "state_change"
+      ],
+      "reversible": true,
+      "why": "commits a file to any project the caller names; history keeps the old version"
+    },
+    "search_repositories": {
+      "capabilities": [
+        "untrusted_input",
+        "private_data"
+      ],
+      "reversible": null,
+      "why": "returns project names and descriptions; private ones the token can see"
+    },
+    "create_repository": {
+      "capabilities": [
+        "external_comms",
+        "state_change"
+      ],
+      "reversible": true,
+      "why": "creates a project, possibly public, with caller-written text; it can be deleted"
+    },
+    "get_file_contents": {
+      "capabilities": [
+        "untrusted_input",
+        "private_data"
+      ],
+      "reversible": null,
+      "why": "returns project content that others wrote; private projects included"
+    },
+    "push_files": {
+      "capabilities": [
+        "external_comms",
+        "state_change"
+      ],
+      "reversible": true,
+      "why": "pushes a commit to any project the caller names; history keeps the old version"
+    },
+    "create_issue": {
+      "capabilities": [
+        "external_comms",
+        "state_change"
+      ],
+      "reversible": false,
+      "why": "opens an issue on any project; watchers are notified"
+    },
+    "create_merge_request": {
+      "capabilities": [
+        "external_comms",
+        "state_change"
+      ],
+      "reversible": false,
+      "why": "opens a merge request; watchers are notified"
+    },
+    "fork_repository": {
+      "capabilities": [
+        "state_change"
+      ],
+      "reversible": true,
+      "why": "forks a project into the account; the fork can be deleted"
+    },
+    "create_branch": {
+      "capabilities": [
+        "external_comms",
+        "state_change"
+      ],
+      "reversible": true,
+      "why": "creates a branch on any project the caller names; it can be deleted"
+    }
+  },
+  "expected_verdict": "GATE",
+  "rationale": "The GitHub server's shape on GitLab: reads content others wrote, sees private projects, publishes to any project."
+}

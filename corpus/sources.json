@@ -1,0 +1,192 @@
+[
+  {
+    "server": "filesystem",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-filesystem",
+    "version": "2.0.1",
+    "licence": "MIT AND Apache-2.0",
+    "args": [
+      "{ROOT}"
+    ],
+    "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
+    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/ef9808f71090d0db3eda99e2af2ba78f1086f4fb/LICENSE"
+  },
+  {
+    "server": "memory",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-memory",
+    "version": "2.0.0",
+    "licence": "MIT AND Apache-2.0",
+    "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/memory",
+    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/ef9808f71090d0db3eda99e2af2ba78f1086f4fb/LICENSE"
+  },
+  {
+    "server": "time",
+    "registry": "pypi",
+    "package": "mcp-server-time",
+    "version": "2026.10.19",
+    "module": "mcp_server_time",
+    "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/time"
+  },
+  {
+    "server": "everything",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-everything",
+    "version": "2.0.1",
+    "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/everything",
+    "licence": "MIT AND Apache-2.0",
+    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/ef9808f71090d0db3eda99e2af2ba78f1086f4fb/LICENSE"
+  },
+  {
+    "server": "sequential-thinking",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-sequential-thinking",
+    "version": "2.0.0",
+    "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking",
+    "licence": "MIT AND Apache-2.0",
+    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/ef9808f71090d0db3eda99e2af2ba78f1086f4fb/LICENSE"
+  },
+  {
+    "server": "fetch",
+    "registry": "pypi",
+    "package": "mcp-server-fetch",
+    "version": "2026.10.24",
+    "module": "mcp_server_fetch",
+    "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/fetch"
+  },
+  {
+    "server": "git",
+    "registry": "pypi",
+    "package": "mcp-server-git",
+    "version": "2026.10.19",
+    "module": "mcp_server_git",
+    "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/git"
+  },
+  {
+    "server": "github",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-github",
+    "version": "2025.4.8",
+    "source": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/github",
+    "env": {
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "dummy"
+    },
+    "notes": "deprecated on npm; still widely installed"
+  },
+  {
+    "server": "slack",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-slack",
+    "version": "2025.4.25",
+    "source": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/slack",
+    "env": {
+      "SLACK_BOT_TOKEN": "xoxb-dummy",
+      "SLACK_TEAM_ID": "T0000000"
+    },
+    "notes": "deprecated on npm"
+  },
+  {
+    "server": "postgres",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-postgres",
+    "version": "0.6.2",
+    "source": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/postgres",
+    "args": [
+      "postgresql://localhost/dummy"
+    ],
+    "notes": "deprecated on npm"
+  },
+  {
+    "server": "puppeteer",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-puppeteer",
+    "version": "2025.5.12",
+    "source": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/puppeteer",
+    "notes": "deprecated on npm"
+  },
+  {
+    "server": "brave-search",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-brave-search",
+    "version": "0.6.2",
+    "source": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/brave-search",
+    "env": {
+      "BRAVE_API_KEY": "dummy"
+    },
+    "notes": "deprecated on npm"
+  },
+  {
+    "server": "google-maps",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-google-maps",
+    "version": "0.6.2",
+    "source": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/google-maps",
+    "env": {
+      "GOOGLE_MAPS_API_KEY": "dummy"
+    },
+    "notes": "deprecated on npm"
+  },
+  {
+    "server": "gitlab",
+    "registry": "npm",
+    "package": "@modelcontextprotocol/server-gitlab",
+    "version": "2025.4.25",
+    "source": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/gitlab",
+    "env": {
+      "GITLAB_PERSONAL_ACCESS_TOKEN": "dummy",
+      "GITLAB_API_URL": "https://gitlab.com/api/v4"
+    },
+    "notes": "deprecated on npm"
+  },
+  {
+    "server": "playwright",
+    "registry": "npm",
+    "package": "@playwright/mcp",
+    "version": "0.0.83",
+    "source": "https://github.com/microsoft/playwright-mcp"
+  },
+  {
+    "server": "context7",
+    "registry": "npm",
+    "package": "@upstash/context7-mcp",
+    "version": "4.4.4",
+    "source": "https://github.com/upstash/context7"
+  },
+  {
+    "server": "notion",
+    "registry": "npm",
+    "package": "@notionhq/notion-mcp-server",
+    "version": "2.5.2",
+    "source": "https://github.com/makenotion/notion-mcp-server",
+    "env": {
+      "NOTION_TOKEN": "dummy"
+    }
+  },
+  {
+    "server": "firecrawl",
+    "registry": "npm",
+    "package": "firecrawl-mcp",
+    "version": "3.36.0",
+    "source": "https://github.com/firecrawl/firecrawl-mcp-server",
+    "env": {
+      "FIRECRAWL_API_KEY": "fc-dummy"
+    }
+  },
+  {
+    "server": "tavily",
+    "registry": "npm",
+    "package": "tavily-mcp",
+    "version": "0.2.22",
+    "source": "https://github.com/tavily-ai/tavily-mcp",
+    "env": {
+      "TAVILY_API_KEY": "tvly-dummy"
+    }
+  },
+  {
+    "server": "kubernetes",
+    "registry": "npm",
+    "package": "mcp-server-kubernetes",
+    "version": "4.2.1",
+    "source": "https://github.com/Flux159/mcp-server-kubernetes"
+  }
+]

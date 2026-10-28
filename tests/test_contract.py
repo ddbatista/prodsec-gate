@@ -72,7 +72,7 @@ NOT_AUDITED = [
     # answers tools/list. (Its REFUSED for --stdio without consent is a
     # deliberate refusal, not bad input, so it is not a row here.)
     ("mcp_fetch", ["--i-will-execute-this", "--stdio", sys.executable, "-c", "pass"],
-     "", "no tools/list response"),
+     "", "server exited before answering"),
 
     # The auditors' input is a project directory and the settings inside it.
     # An EMPTY project is not a row: absent config is audited as Claude Code's
