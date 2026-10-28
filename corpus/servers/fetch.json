@@ -69,5 +69,5 @@
     }
   },
   "expected_verdict": "SHIP",
-  "rationale": "Fetches any URL: untrusted content and an outbound channel, but alone it has no private data to leak."
+  "rationale": "Judged alone: untrusted content and an outbound channel, but no private data of its own. Paired with a server that reads private data it completes the trifecta."
 }

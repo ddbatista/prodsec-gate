@@ -362,11 +362,10 @@
     },
     "tavily_map": {
       "capabilities": [
-        "untrusted_input",
         "external_comms"
       ],
       "reversible": null,
-      "why": "crawls a caller-chosen site and returns the URLs found"
+      "why": "crawls a caller-chosen site and returns only the URLs found"
     },
     "tavily_research": {
       "capabilities": [
@@ -377,5 +376,5 @@
     }
   },
   "expected_verdict": "SHIP",
-  "rationale": "Web search, extraction and crawling: untrusted content and caller-chosen URLs, but nothing private to leak."
+  "rationale": "Judged alone: untrusted web content and caller-chosen URLs, but no private data of its own. Paired with a server that reads private data it completes the trifecta."
 }

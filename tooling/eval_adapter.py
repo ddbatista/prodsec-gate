@@ -29,6 +29,9 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+import _cli                      # noqa: E402
 
 
 def _load(path, name):
@@ -126,7 +129,10 @@ def report(label, corpus, backend):
 # inferred; the "oracle" verdict from running triage on the labels themselves.
 # When derived and expected disagree, the oracle says whose problem it is:
 #   detection  the oracle agrees with the label, so the legs were wrong
-#   policy     the oracle disagrees too: right legs, disputed verdict
+#   policy     the oracle disagrees too, and the legs were right: a disputed
+#              verdict, not a detection bug
+#   both       the oracle disagrees AND some legs were wrong: fix the legs,
+#              and the verdict is still a policy question
 # A policy question is never fixed by weakening a pattern.
 
 PERMISSIVE = {"MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC",
@@ -141,9 +147,14 @@ def licence_ok(expr):
     """True when every licence an SPDX expression names is permissive. An OR
     is not taken as a choice: the corpus commits text under every licence it
     names, so all of them must allow that."""
-    ids = str(expr or "").replace("(", " ").replace(")", " ").split()
-    ids = [i for i in ids if i not in ("AND", "OR")]
+    ids = licence_ids(expr)
     return bool(ids) and all(i in PERMISSIVE for i in ids)
+
+
+def licence_ids(expr):
+    """The licence ids an SPDX expression names, operators and brackets dropped."""
+    words = str(expr or "").replace("(", " ").replace(")", " ").split()
+    return [w for w in words if w not in ("AND", "OR", "WITH")]
 
 
 def problems(fx):
@@ -245,7 +256,7 @@ def corpus_metrics(servers, infer=None):
     misses, mismatches, disputes = [], [], []
     gated = acceptable = 0
     for fx in servers:
-        derived, oracle = [], []
+        derived, oracle, legs_wrong = [], [], False
         for tool in A.tools_of(fx["tools"]):
             lab = fx["labels"][tool["name"]]
             truth = set(lab["capabilities"])
@@ -260,7 +271,12 @@ def corpus_metrics(servers, infer=None):
                     caps[c]["fn"] += 1
             if truth - got:
                 misses.append((fx["server"], tool["name"], sorted(truth - got)))
-            derived.append((tool["name"], got, rev if "state_change" in got else None))
+            derived_rev = rev if "state_change" in got else None
+            if got != truth or ("state_change" in truth and
+                                (True if derived_rev is None else derived_rev)
+                                != lab["reversible"]):
+                legs_wrong = True
+            derived.append((tool["name"], got, derived_rev))
             oracle.append((tool["name"], truth, lab["reversible"]))
         d, o, want = _verdict(derived), _verdict(oracle), fx["expected_verdict"]
         if want == "SHIP":
@@ -269,8 +285,9 @@ def corpus_metrics(servers, infer=None):
         if o != want:
             disputes.append(fx["server"])
         if d != want:
+            kind = "detection" if o == want else "both" if legs_wrong else "policy"
             mismatches.append({"server": fx["server"], "expected": want, "derived": d,
-                               "oracle": o, "kind": "detection" if o == want else "policy"})
+                               "oracle": o, "kind": kind})
     overall = {k: sum(c[k] for c in caps.values()) for k in ("tp", "fp", "fn")}
     return {"capabilities": caps, "overall": overall, "misses": misses,
             "mismatches": mismatches, "policy_disputes": disputes,
@@ -283,7 +300,7 @@ def _rate(k, n):
     if not n:
         return "%3d/%-3d =   n/a" % (k, n)
     lo, hi = wilson(k, n)
-    return "%3d/%-3d = %5.1f%%  [%5.1f–%5.1f%%]" % (k, n, 100 * k / n if n else 0,
+    return "%3d/%-3d = %5.1f%%  [%5.1f–%5.1f%%]" % (k, n, 100 * k / n,
                                                    lo * 100, hi * 100)
 
 
@@ -317,7 +334,8 @@ def report_corpus(m):
     print("=" * 74)
 
 
-def main():
+@_cli.entrypoint
+def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--live", action="store_true")
     ap.add_argument("--corpus", default=os.path.join(HERE, "corpus.json"))
@@ -327,13 +345,14 @@ def main():
     ap.add_argument("--write-baseline", metavar="FILE",
                     help="with --servers: record today's recall as the floor the "
                          "ratchet holds (review the diff: it must not go down)")
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
+    if a.write_baseline and not a.servers:
+        raise _cli.NotAudited("--write-baseline needs --servers DIR")
     if a.servers:
         try:
             servers = load_servers(a.servers)
         except ValueError as e:
-            print("ERROR: %s" % e, file=sys.stderr)
-            return 2
+            raise _cli.NotAudited(str(e))
         m = corpus_metrics(servers)
         report_corpus(m)
         if a.write_baseline:

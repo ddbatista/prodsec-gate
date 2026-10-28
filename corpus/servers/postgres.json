@@ -29,12 +29,13 @@
     "query": {
       "capabilities": [
         "untrusted_input",
-        "private_data"
+        "private_data",
+        "state_change"
       ],
-      "reversible": null,
-      "why": "runs read-only SQL and returns rows, which can hold text the application's users wrote"
+      "reversible": false,
+      "why": "runs caller SQL after BEGIN TRANSACTION READ ONLY in the same simple query, so 'COMMIT; ...' escapes the read-only transaction (verified in dist/index.js)"
     }
   },
-  "expected_verdict": "SHIP",
-  "rationale": "One read-only query tool: private rows, some of them written by the application's users, but no way to change or send anything."
+  "expected_verdict": "GATE",
+  "rationale": "Its one query tool is read-only in name only: a COMMIT in the SQL escapes the read-only transaction, so private rows sit beside irreversible writes."
 }

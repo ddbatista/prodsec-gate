@@ -7,13 +7,14 @@ and the ratchet never run this; only rebuilding the corpus does.
 
 Every capture follows the same order, so no third-party code runs unconfined:
 
-  1. read the registry metadata and refuse a non-permissive licence BEFORE
-     anything is downloaded;
+  1. decide the licence from registry metadata (or a commit-pinned licence
+     file) and refuse anything non-permissive BEFORE anything is downloaded;
   2. install the pinned version with install scripts disabled (npm
      --ignore-scripts; pip wheels only), so installing executes nothing;
   3. run the server inside corpus/sandbox.sb (macOS sandbox-exec: no network,
-     no reads under $HOME, writes only in a throwaway directory) just long
-     enough to answer tools/list;
+     no Mach services or AppleEvents, an exec allow-list, no reads of user
+     data, writes only in a throwaway directory) with a replaced environment,
+     just long enough to answer tools/list;
   4. write corpus/servers/<server>.json, keeping existing labels for tools
      that are still there. A new or renamed tool is left unlabelled, so the
      schema test fails until a human labels it.
@@ -55,7 +56,11 @@ LICENCE_TEXT = {
 
 
 def sh(cmd, **kw):
-    return subprocess.run(cmd, check=True, capture_output=True, text=True, **kw).stdout
+    p = subprocess.run(cmd, capture_output=True, text=True, **kw)
+    if p.returncode:
+        raise RuntimeError("%s failed (exit %d): %s"
+                           % (" ".join(cmd[:3]), p.returncode, p.stderr.strip()[-400:]))
+    return p.stdout
 
 
 def npm_meta(src):
@@ -73,33 +78,25 @@ def pypi_meta(src):
     return info["version"], lic, urls.get("Source") or urls.get("Repository") or ""
 
 
-def licence_of(registry_licence, src, package_dir):
-    """The SPDX expression to record, or raise.
+def licence_of(registry_licence, src):
+    """The SPDX expression to record, decided BEFORE anything is downloaded.
 
     The registry's own field wins when it is permissive. When it only points
-    at a file ("SEE LICENSE IN LICENSE"), src must name the licence and the
-    file -- in the package, or at src["licence_url"] -- must contain each
-    named licence's text.
+    at a file ("SEE LICENSE IN LICENSE"), src must name the licence and give
+    a licence_url, pinned to a commit, whose text names every licence in it.
     """
     if E.licence_ok(registry_licence):
         return registry_licence
     claimed = src.get("licence")
-    if not E.licence_ok(claimed):
-        raise RuntimeError("licence %r is not on the permissive list" % registry_licence)
-    texts = []
-    for name in ("LICENSE", "LICENSE.md", "LICENSE.txt"):
-        p = os.path.join(package_dir or "", name)
-        if package_dir and os.path.exists(p):
-            texts.append(open(p, errors="replace").read())
-    if src.get("licence_url"):
-        with urllib.request.urlopen(src["licence_url"], timeout=30) as r:
-            texts.append(r.read().decode("utf-8", "replace"))
-    ids = [i for i in claimed.replace("(", " ").replace(")", " ").split()
-           if i not in ("AND", "OR")]
-    for i in ids:
-        if i not in LICENCE_TEXT or not any(LICENCE_TEXT[i] in t for t in texts):
-            raise RuntimeError("registry says %r and no licence text confirms %s"
-                               % (registry_licence, i))
+    if not E.licence_ok(claimed) or not src.get("licence_url"):
+        raise RuntimeError("licence %r is not on the permissive list; nothing downloaded"
+                           % registry_licence)
+    with urllib.request.urlopen(src["licence_url"], timeout=30) as r:
+        text = r.read().decode("utf-8", "replace")
+    for i in E.licence_ids(claimed):
+        if i not in LICENCE_TEXT or LICENCE_TEXT[i] not in text:
+            raise RuntimeError("registry says %r and %s does not confirm %s; nothing "
+                               "downloaded" % (registry_licence, src["licence_url"], i))
     return claimed
 
 
@@ -111,7 +108,7 @@ def install_npm(src, version, work):
     bins = pj["bin"] if isinstance(pj["bin"], dict) else {pj["name"]: pj["bin"]}
     entry = os.path.join(pkg_dir, bins[src.get("bin") or sorted(bins)[0]])
     node = os.path.realpath(shutil.which("node"))
-    return pkg_dir, [node, entry], os.path.dirname(os.path.dirname(node))
+    return [node, entry], os.path.dirname(os.path.dirname(node))
 
 
 def install_pypi(src, version, work):
@@ -120,41 +117,46 @@ def install_pypi(src, version, work):
         "--no-compile", "--target", site, "%s==%s" % (src["package"], version)])
     boot = ("import runpy, sys; sys.path.insert(0, %r); "
             "runpy.run_module(%r, run_name='__main__')" % (site, src["module"]))
-    return None, [os.path.realpath(sys.executable), "-c", boot], os.path.realpath(sys.base_prefix)
+    return [os.path.realpath(sys.executable), "-c", boot], os.path.realpath(sys.base_prefix)
+
+
+REGISTRIES = {"npm": (npm_meta, install_npm), "pypi": (pypi_meta, install_pypi)}
+
+
+def check_runtime(runtime, guarded):
+    """The sandbox lets the server read all of RUNTIME. Refuse a RUNTIME that
+    would re-open what the profile closes (a node in ~/bin makes it ~)."""
+    for g in guarded:
+        if os.path.commonpath([runtime, g]) == runtime:
+            raise RuntimeError("runtime directory %s contains %s; the sandbox would "
+                               "let the server read it" % (runtime, g))
 
 
 def capture(src):
-    registry = src["registry"]
-    version, lic, repo = (npm_meta if registry == "npm" else pypi_meta)(src)
-    if not E.licence_ok(lic) and not E.licence_ok(src.get("licence")):
-        raise RuntimeError("licence %r is not on the permissive list; nothing downloaded" % lic)
+    meta, install = REGISTRIES[src["registry"]]
+    version, lic, repo = meta(src)
+    licence = licence_of(lic, src)
 
     work = os.path.realpath(tempfile.mkdtemp(prefix="prodsec-capture-"))
+    temp = os.path.dirname(work)
+    home = os.path.realpath(os.path.expanduser("~"))
     try:
-        install = install_npm if registry == "npm" else install_pypi
-        pkg_dir, cmd, runtime = install(src, version, work)
-        licence = licence_of(lic, src, pkg_dir)
-        os.makedirs(os.path.join(work, "home"))
-        os.makedirs(os.path.join(work, "tmp"))
-        os.makedirs(os.path.join(work, "root"))
+        cmd, runtime = install(src, version, work)
+        check_runtime(runtime, [home, "/Users", temp])
+        for d in ("home", "tmp", "root"):
+            os.makedirs(os.path.join(work, d))
         args = [a.replace("{ROOT}", os.path.join(work, "root")) for a in src.get("args", [])]
         env = {"PATH": "/usr/bin:/bin", "HOME": os.path.join(work, "home"),
                "TMPDIR": os.path.join(work, "tmp"), "LANG": "C.UTF-8"}
         env.update(src.get("env", {}))
         # env -i: the server sees only these variables, never the maintainer's.
         sandboxed = (["/usr/bin/env", "-i"] + ["%s=%s" % kv for kv in sorted(env.items())]
-                     + ["/usr/bin/sandbox-exec", "-f", PROFILE,
-                        "-D", "HOME=" + os.path.realpath(os.path.expanduser("~")),
-                        "-D", "WORK=" + work, "-D", "RUNTIME=" + runtime]
+                     + ["/usr/bin/sandbox-exec", "-f", PROFILE, "-D", "WORK=" + work,
+                        "-D", "RUNTIME=" + runtime, "-D", "TEMP=" + temp]
                      + cmd + args)
-        # Start inside WORK: the sandbox denies reads under $HOME, and a server
-        # whose working directory it cannot read dies before it answers.
-        cwd = os.getcwd()
-        os.chdir(work)
-        try:
-            dump = mcp_fetch.fetch_stdio(sandboxed, timeout=src.get("timeout", 60))
-        finally:
-            os.chdir(cwd)
+        # Start inside WORK: a server whose working directory the sandbox
+        # will not let it read dies before it answers.
+        dump = mcp_fetch.fetch_stdio(sandboxed, timeout=src.get("timeout", 60), cwd=work)
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -165,7 +167,7 @@ def capture(src):
     fx = {
         "server": src["server"],
         "package": src["package"],
-        "registry": registry,
+        "registry": src["registry"],
         "version": version,
         "source": src.get("source") or repo,
         "licence": licence,

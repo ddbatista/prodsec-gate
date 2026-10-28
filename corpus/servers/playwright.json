@@ -958,26 +958,29 @@
     "browser_evaluate": {
       "capabilities": [
         "untrusted_input",
-        "external_comms"
+        "external_comms",
+        "state_change"
       ],
-      "reversible": null,
-      "why": "runs JavaScript in the page, which can request any URL, and returns the result"
+      "reversible": false,
+      "why": "runs JavaScript in the page: it can request any URL, click and submit, and returns the result"
     },
     "browser_file_upload": {
       "capabilities": [
+        "untrusted_input",
         "private_data",
         "external_comms"
       ],
       "reversible": null,
-      "why": "reads local files and hands them to the page"
+      "why": "reads local files and hands them to the page; returns a page snapshot afterwards, which the site controls"
     },
     "browser_drop": {
       "capabilities": [
+        "untrusted_input",
         "private_data",
         "external_comms"
       ],
       "reversible": null,
-      "why": "drops local files or data onto the page"
+      "why": "drops local files or data onto the page; returns a page snapshot afterwards, which the site controls"
     },
     "browser_find": {
       "capabilities": [
@@ -988,24 +991,28 @@
     },
     "browser_fill_form": {
       "capabilities": [
+        "external_comms",
         "state_change"
       ],
       "reversible": false,
-      "why": "fills form fields on a live site"
+      "why": "fills caller values into a live form, which the site receives"
     },
     "browser_press_key": {
       "capabilities": [
+        "untrusted_input",
         "state_change"
       ],
       "reversible": false,
-      "why": "presses keys on a live page, which can submit forms"
+      "why": "acts on a live site, which can submit or confirm actions; returns a page snapshot afterwards, which the site controls"
     },
     "browser_type": {
       "capabilities": [
+        "untrusted_input",
+        "external_comms",
         "state_change"
       ],
       "reversible": false,
-      "why": "types into a live page and can submit"
+      "why": "types caller text into a live page, which the site receives and can submit; returns a page snapshot"
     },
     "browser_navigate": {
       "capabilities": [
@@ -1016,9 +1023,11 @@
       "why": "loads any URL the caller picks"
     },
     "browser_navigate_back": {
-      "capabilities": [],
+      "capabilities": [
+        "untrusted_input"
+      ],
       "reversible": null,
-      "why": "goes back in session history"
+      "why": "goes back in history; returns a page snapshot afterwards, which the site controls"
     },
     "browser_network_requests": {
       "capabilities": [
@@ -1038,12 +1047,13 @@
     },
     "browser_run_code_unsafe": {
       "capabilities": [
+        "untrusted_input",
         "private_data",
         "external_comms",
         "state_change"
       ],
       "reversible": false,
-      "why": "runs arbitrary code in the server process; its own description calls it RCE-equivalent"
+      "why": "runs arbitrary code in the server process and returns its output; its own description calls it RCE-equivalent"
     },
     "browser_take_screenshot": {
       "capabilities": [
@@ -1061,41 +1071,49 @@
     },
     "browser_click": {
       "capabilities": [
+        "untrusted_input",
         "state_change"
       ],
       "reversible": false,
-      "why": "clicks on a live site, which can submit or confirm actions"
+      "why": "acts on a live site, which can submit or confirm actions; returns a page snapshot afterwards, which the site controls"
     },
     "browser_drag": {
       "capabilities": [
+        "untrusted_input",
         "state_change"
       ],
       "reversible": false,
-      "why": "drags elements on a live page"
+      "why": "acts on a live site, which can submit or confirm actions; returns a page snapshot afterwards, which the site controls"
     },
     "browser_hover": {
-      "capabilities": [],
+      "capabilities": [
+        "untrusted_input"
+      ],
       "reversible": null,
-      "why": "hovers an element"
+      "why": "hovers an element; returns a page snapshot afterwards, which the site controls"
     },
     "browser_select_option": {
       "capabilities": [
+        "untrusted_input",
         "state_change"
       ],
       "reversible": false,
-      "why": "selects an option in a live form"
+      "why": "acts on a live site, which can submit or confirm actions; returns a page snapshot afterwards, which the site controls"
     },
     "browser_tabs": {
       "capabilities": [
+        "untrusted_input",
         "external_comms"
       ],
       "reversible": null,
-      "why": "can open a new tab at any URL the caller picks"
+      "why": "can open a new tab at any URL the caller picks; returns a page snapshot afterwards, which the site controls"
     },
     "browser_wait_for": {
-      "capabilities": [],
+      "capabilities": [
+        "untrusted_input"
+      ],
       "reversible": null,
-      "why": "waits for text or time"
+      "why": "waits for text or time; returns a page snapshot afterwards, which the site controls"
     }
   },
   "expected_verdict": "GATE",

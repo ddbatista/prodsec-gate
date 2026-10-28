@@ -181,10 +181,11 @@
   "labels": {
     "slack_list_channels": {
       "capabilities": [
+        "untrusted_input",
         "private_data"
       ],
       "reversible": null,
-      "why": "lists the workspace's channels"
+      "why": "lists channels with the topics and purposes members wrote"
     },
     "slack_post_message": {
       "capabilities": [
@@ -207,8 +208,8 @@
         "external_comms",
         "state_change"
       ],
-      "reversible": true,
-      "why": "adds a visible reaction; it can be removed"
+      "reversible": false,
+      "why": "adds a reaction members see at once"
     },
     "slack_get_channel_history": {
       "capabilities": [
@@ -228,17 +229,19 @@
     },
     "slack_get_users": {
       "capabilities": [
+        "untrusted_input",
         "private_data"
       ],
       "reversible": null,
-      "why": "lists workspace members and their profiles"
+      "why": "lists members with profile fields they wrote"
     },
     "slack_get_user_profile": {
       "capabilities": [
+        "untrusted_input",
         "private_data"
       ],
       "reversible": null,
-      "why": "returns a member's profile"
+      "why": "returns a member's profile, including fields they wrote"
     }
   },
   "expected_verdict": "GATE",

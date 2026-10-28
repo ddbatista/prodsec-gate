@@ -1,8 +1,13 @@
 ;; macOS sandbox for running a third-party MCP server just long enough to
 ;; answer tools/list. Used by corpus/capture.py; see corpus/README.md.
 ;;
-;;   no network at all      a server cannot phone home or exfiltrate
-;;   no reads under $HOME   except the runtime it needs (RUNTIME)
+;;   no network             no sockets of its own...
+;;   no services            ...and no Mach lookups or AppleEvents, so it
+;;                          cannot ask a daemon (LaunchServices, nsurlsessiond,
+;;                          Terminal via `open`) to reach the network for it
+;;   exec allow-list        only the runtime it was installed for, and git
+;;   no reads of user data  no contents or listings under /Users, /Volumes or
+;;                          the per-user temp directory, except WORK and RUNTIME
 ;;   writes only in WORK    the throwaway install directory
 ;;
 ;; In SBPL the last matching rule wins, so each allow below narrows a deny.
@@ -10,9 +15,24 @@
 (allow default)
 
 (deny network*)
+(deny mach-lookup)
+(deny appleevent-send)
 
-(deny file-read* (subpath (param "HOME")))
-(allow file-read*
+(deny process-exec)
+(allow process-exec
+  (subpath (param "RUNTIME"))
+  (literal "/bin/sh")
+  (literal "/usr/bin/git")
+  (literal "/usr/bin/xcrun")
+  (subpath "/Library/Developer/CommandLineTools"))
+
+;; file-read-data, not file-read*: resolving a path still needs lstat on its
+;; parents, but listing a directory or reading a file is denied.
+(deny file-read-data
+  (subpath "/Users")
+  (subpath "/Volumes")
+  (subpath (param "TEMP")))
+(allow file-read-data
   (subpath (param "WORK"))
   (subpath (param "RUNTIME")))
 

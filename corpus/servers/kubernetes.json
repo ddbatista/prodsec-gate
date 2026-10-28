@@ -1156,24 +1156,27 @@
     },
     "kubectl_get": {
       "capabilities": [
+        "untrusted_input",
         "private_data"
       ],
       "reversible": null,
-      "why": "returns cluster resources, which can include secrets"
+      "why": "returns cluster resources: secrets, configmap data and annotations others wrote"
     },
     "kubectl_describe": {
       "capabilities": [
+        "untrusted_input",
         "private_data"
       ],
       "reversible": null,
-      "why": "returns cluster resources, which can include secrets"
+      "why": "returns resources with their events and annotations, which others wrote"
     },
     "kubectl_apply": {
       "capabilities": [
+        "external_comms",
         "state_change"
       ],
       "reversible": false,
-      "why": "applies a manifest, replacing the live configuration"
+      "why": "applies a manifest, replacing the live configuration; workloads it starts can reach the network"
     },
     "kubectl_delete": {
       "capabilities": [
@@ -1184,10 +1187,11 @@
     },
     "kubectl_create": {
       "capabilities": [
+        "external_comms",
         "state_change"
       ],
       "reversible": false,
-      "why": "creates resources; workloads start running at once"
+      "why": "creates resources; workloads start at once and can reach the network"
     },
     "kubectl_logs": {
       "capabilities": [
@@ -1238,17 +1242,19 @@
     },
     "install_helm_chart": {
       "capabilities": [
+        "external_comms",
         "state_change"
       ],
       "reversible": false,
-      "why": "installs a release; its workloads start at once"
+      "why": "installs a release from a caller-chosen chart repo URL; its workloads start at once and can reach the network"
     },
     "upgrade_helm_chart": {
       "capabilities": [
+        "external_comms",
         "state_change"
       ],
       "reversible": false,
-      "why": "upgrades a live release"
+      "why": "upgrades a live release from a caller-chosen chart repo URL"
     },
     "uninstall_helm_chart": {
       "capabilities": [
@@ -1276,12 +1282,13 @@
     },
     "exec_in_pod": {
       "capabilities": [
+        "untrusted_input",
         "private_data",
         "external_comms",
         "state_change"
       ],
       "reversible": false,
-      "why": "runs any command in a pod: it can read mounted secrets, reach the network and change state"
+      "why": "runs any command in a pod and returns its output: it can read mounted secrets, reach the network and change state"
     },
     "list_api_resources": {
       "capabilities": [
@@ -1292,12 +1299,13 @@
     },
     "kubectl_generic": {
       "capabilities": [
+        "untrusted_input",
         "private_data",
         "external_comms",
         "state_change"
       ],
       "reversible": false,
-      "why": "runs any kubectl command, exec included"
+      "why": "runs any kubectl command, exec included, and returns its output"
     },
     "ping": {
       "capabilities": [],

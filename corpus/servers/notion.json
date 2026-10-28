@@ -6544,10 +6544,11 @@
     },
     "API-retrieve-a-data-source": {
       "capabilities": [
+        "untrusted_input",
         "private_data"
       ],
       "reversible": null,
-      "why": "returns a database's schema"
+      "why": "returns a database's schema with the title and description collaborators wrote"
     },
     "API-update-a-data-source": {
       "capabilities": [
@@ -6565,17 +6566,19 @@
     },
     "API-list-data-source-templates": {
       "capabilities": [
+        "untrusted_input",
         "private_data"
       ],
       "reversible": null,
-      "why": "lists a database's templates"
+      "why": "returns templates collaborators wrote"
     },
     "API-retrieve-a-database": {
       "capabilities": [
+        "untrusted_input",
         "private_data"
       ],
       "reversible": null,
-      "why": "returns a database's metadata"
+      "why": "returns a database's metadata, including the description collaborators wrote"
     },
     "API-move-page": {
       "capabilities": [

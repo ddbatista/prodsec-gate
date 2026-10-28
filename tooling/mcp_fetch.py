@@ -24,6 +24,7 @@ Wire format (stdio): newline-delimited JSON-RPC.
   --> tools/list
 """
 import argparse
+import collections
 import json
 import os
 import queue
@@ -66,62 +67,77 @@ def _msgs():
     )
 
 
-def fetch_stdio(command, timeout=30):
+def fetch_stdio(command, timeout=30, cwd=None):
     """Talk to the server one request at a time, keeping stdin open until the
     last answer. Writing everything and closing stdin is not enough: the
     Python MCP SDK shuts down on EOF and drops the request still in flight.
     Follows tools/list pagination (nextCursor)."""
     init, ready, listing = _msgs()
     p = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE, text=True)
-    lines, err = queue.Queue(), []
-    threading.Thread(target=lambda: [lines.put(x) for x in p.stdout] + [lines.put(None)],
-                     daemon=True).start()
-    threading.Thread(target=lambda: err.extend(p.stderr), daemon=True).start()
+                         stderr=subprocess.PIPE, text=True, cwd=cwd)
+    lines = queue.Queue()
+    err = collections.deque(maxlen=50)    # the tail is what explains a failure
+
+    def pump_stdout():
+        for x in p.stdout:
+            lines.put(x)
+        lines.put(None)
+
+    def pump_stderr():
+        for x in p.stderr:
+            err.append(x)
+
+    threading.Thread(target=pump_stdout, daemon=True).start()
+    stderr_done = threading.Thread(target=pump_stderr, daemon=True)
+    stderr_done.start()
     deadline = time.monotonic() + timeout
+
+    def stderr_tail():
+        stderr_done.join(timeout=1)
+        return "".join(err)[-400:]
 
     def send(msg):
         p.stdin.write(json.dumps(msg) + "\n")
         p.stdin.flush()
 
-    def answer(want):
+    def answer(want, what):
         while True:
             try:
                 line = lines.get(timeout=max(0.0, deadline - time.monotonic()))
             except queue.Empty:
-                raise RuntimeError("server did not answer within %ds" % timeout)
+                raise RuntimeError("server did not answer %s within %ds.\nstderr: %s"
+                                   % (what, timeout, "".join(err)[-400:]))
             if line is None:
-                time.sleep(0.1)           # let stderr drain for the message
-                raise RuntimeError("no tools/list response.\nstderr: %s"
-                                   % "".join(err)[:400])
+                raise RuntimeError("server exited before answering %s.\nstderr: %s"
+                                   % (what, stderr_tail()))
             try:
                 msg = json.loads(line)
             except json.JSONDecodeError:
                 continue                  # servers log to stdout; skip noise
-            if isinstance(msg, dict) and msg.get("id") == want:
+            # A request FROM the server can reuse our id; only a response counts.
+            if isinstance(msg, dict) and msg.get("id") == want and "method" not in msg:
                 if "result" not in msg:
-                    raise RuntimeError("server answered with an error: %s"
-                                       % json.dumps(msg.get("error"))[:400])
+                    raise RuntimeError("server answered %s with an error: %s"
+                                       % (what, json.dumps(msg.get("error"))[:400]))
                 return msg
 
     try:
         send(init)
-        answer(init["id"])
+        answer(init["id"], "initialize")
         send(ready)
         send(listing)
-        first = answer(listing["id"])
+        first = answer(listing["id"], "tools/list")
         tools = list(first["result"].get("tools", []))
         cursor, n = first["result"].get("nextCursor"), listing["id"]
         while cursor:
             n += 1
             send({"jsonrpc": "2.0", "id": n, "method": "tools/list",
                   "params": {"cursor": cursor}})
-            page = answer(n)["result"]
+            page = answer(n, "tools/list page %d" % (n - listing["id"] + 1))["result"]
             tools += page.get("tools", [])
             cursor = page.get("nextCursor")
-    except (BrokenPipeError, OSError) as e:
-        raise RuntimeError("server exited early (%s).\nstderr: %s"
-                           % (e, "".join(err)[:400]))
+    except OSError as e:
+        raise RuntimeError("server exited early (%s).\nstderr: %s" % (e, stderr_tail()))
     finally:
         try:
             p.stdin.close()
@@ -131,6 +147,7 @@ def fetch_stdio(command, timeout=30):
             p.wait(timeout=5)
         except subprocess.TimeoutExpired:
             p.kill()
+            p.wait()
     first["result"]["tools"] = tools
     first["result"].pop("nextCursor", None)
     return first

@@ -1121,10 +1121,11 @@
     },
     "create_branch": {
       "capabilities": [
+        "external_comms",
         "state_change"
       ],
       "reversible": true,
-      "why": "creates a branch, which can be deleted"
+      "why": "creates a branch on any repo the caller names; it can be deleted"
     },
     "list_commits": {
       "capabilities": [
@@ -1218,7 +1219,7 @@
         "state_change"
       ],
       "reversible": false,
-      "why": "merges into the base branch, which may deploy; a revert is a new change"
+      "why": "merges and closes the pull request; participants are notified"
     },
     "get_pull_request_files": {
       "capabilities": [

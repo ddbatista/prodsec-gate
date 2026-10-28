@@ -71,9 +71,9 @@ keyword patterns, and annotations are evidence, not truth.
 
 | Capability | Label it when the tool… |
 |---|---|
-| `untrusted_input` | returns **free text that someone other than the user can shape**: web pages, files of unknown origin, issues and comments, messages, documents, logs, reviews, search results, stored memory written in earlier sessions. Names, sizes, statuses and generated facts (coordinates, timezones, sums) do not count. |
+| `untrusted_input` | returns **free text that someone other than the user can shape**: web pages, files of unknown origin, issues and comments, messages, documents, logs, the output of an arbitrary command or script, reviews, search results, profiles and descriptions others wrote, resource annotations and events, a page snapshot an action returns, stored memory written in earlier sessions. Names, paths, URL lists, sizes, statuses and generated facts (coordinates, timezones, sums) do not count. |
 | `private_data` | returns or reveals data that is not public: local files and their names, environment variables, private repositories, database rows, messages, workspace pages, cluster state, account details, stored memory. |
-| `external_comms` | can send data where an outsider may read it: a request to a URL the caller picks (the URL itself is a channel), a message, comment, issue or pull request addressed to people, a write to a repository or channel the caller names, an upload a page receives, or a command that can reach the network. A query to the server's own fixed API (a search engine, a docs index) is not egress, and neither is writing into the user's own store. |
+| `external_comms` | can send data where an outsider may read it: a request to a URL the caller picks (the URL itself is a channel), a message, comment, issue or pull request addressed to people, a write (even a branch) to a repository or channel the caller names, text or files typed, filled or uploaded into a live page, a chart or package repository URL the caller picks, or a command or workload that can reach the network. A query to the server's own fixed API (a search engine, a docs index) is not egress, and neither is writing into the user's own store. |
 | `state_change` | changes persistent state anywhere: files, repositories, databases, workspace pages, remote accounts, clusters, a live web page (a click or form submission), stored memory. Reading, listing, pure computation and session-only state (a tab, a tunnel) do not. |
 
 `reversible` (only with `state_change`): `true` when the user can undo the
@@ -83,7 +83,7 @@ history keeps, a delete that only moves to a trash. `false` when data is
 destroyed or replaced (delete, overwrite, in-place edit), when people have
 already been notified (a message, comment, issue or review), or when the
 effect has already happened elsewhere (a form submitted, a command run, a
-workload started or scaled, money or credits spent).
+workload started or scaled, money moved). Spending API credits is usage, not a state change.
 
 **Expected verdict** is a separate, human policy call: would a careful
 reviewer let an agent with exactly this server run unattended? It is recorded
@@ -102,13 +102,17 @@ For each server, in this order:
 
 1. **Licence, before download.** The registry metadata must name a
    permissive licence. When it only points at a file ("SEE LICENSE IN
-   LICENSE"), `sources.json` must state the licence and the file's text,
-   in the package or at `licence_url`, must confirm it.
+   LICENSE"), `sources.json` must state the licence and give a `licence_url`
+   pinned to a commit, whose text must name every licence stated.
 2. **Install without running anything.** npm runs with `--ignore-scripts`;
    pip takes wheels only. Installing executes no package code.
 3. **Run sandboxed.** The server starts under `sandbox.sb`: no network, no
-   reads under `$HOME` except the Node or Python runtime, writes only in a
-   throwaway directory. Its environment is replaced with a minimal one
+   Mach service lookups or AppleEvents (so it cannot ask a daemon such as
+   LaunchServices to reach the network for it), an exec allow-list (its
+   runtime and git), no file contents or listings under `/Users`, `/Volumes`
+   or the per-user temp directory except its runtime and scratch directory,
+   and writes only in that scratch directory. A runtime installed somewhere
+   that would re-open those paths (such as `~/bin/node`) is refused. Its environment is replaced with a minimal one
    (`env -i`), so it never sees the maintainer's variables or tokens. It runs
    only long enough to answer `tools/list`.
 4. **Keep labels.** Labels for tools that are still present are kept. A new

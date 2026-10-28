@@ -4710,18 +4710,18 @@
     "firecrawl_scrape": {
       "capabilities": [
         "untrusted_input",
-        "external_comms"
+        "external_comms",
+        "state_change"
       ],
-      "reversible": null,
-      "why": "fetches any URL the caller picks and returns its content"
+      "reversible": false,
+      "why": "fetches any URL; its actions can click, type and run JavaScript on the live page"
     },
     "firecrawl_map": {
       "capabilities": [
-        "untrusted_input",
         "external_comms"
       ],
       "reversible": null,
-      "why": "crawls a caller-chosen site and returns its URLs"
+      "why": "requests a caller-chosen site and returns only its URLs"
     },
     "firecrawl_search": {
       "capabilities": [
@@ -4841,11 +4841,9 @@
       "why": "permanently deletes a monitor; the description says it cannot be undone"
     },
     "firecrawl_monitor_run": {
-      "capabilities": [
-        "state_change"
-      ],
-      "reversible": false,
-      "why": "queues an immediate check, spending credits"
+      "capabilities": [],
+      "reversible": null,
+      "why": "queues a check of targets already configured; spending API credits is usage, not state"
     },
     "firecrawl_monitor_checks": {
       "capabilities": [

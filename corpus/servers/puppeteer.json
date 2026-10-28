@@ -181,10 +181,11 @@
     },
     "puppeteer_fill": {
       "capabilities": [
+        "external_comms",
         "state_change"
       ],
       "reversible": false,
-      "why": "fills a live form field"
+      "why": "fills caller text into a live form field, which the site receives"
     },
     "puppeteer_select": {
       "capabilities": [
@@ -201,10 +202,11 @@
     "puppeteer_evaluate": {
       "capabilities": [
         "untrusted_input",
-        "external_comms"
+        "external_comms",
+        "state_change"
       ],
-      "reversible": null,
-      "why": "runs JavaScript in the page, which can request any URL, and returns the result"
+      "reversible": false,
+      "why": "runs JavaScript in the page: it can request any URL, click and submit, and returns the result"
     }
   },
   "expected_verdict": "GATE",

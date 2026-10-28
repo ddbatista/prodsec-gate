@@ -140,10 +140,11 @@
     },
     "create_branch": {
       "capabilities": [
+        "external_comms",
         "state_change"
       ],
       "reversible": true,
-      "why": "creates a branch, which can be deleted"
+      "why": "creates a branch on any project the caller names; it can be deleted"
     }
   },
   "expected_verdict": "GATE",

@@ -9,7 +9,7 @@
       "{ROOT}"
     ],
     "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
-    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/main/LICENSE"
+    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/ef9808f71090d0db3eda99e2af2ba78f1086f4fb/LICENSE"
   },
   {
     "server": "memory",
@@ -18,7 +18,7 @@
     "version": "2.0.0",
     "licence": "MIT AND Apache-2.0",
     "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/memory",
-    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/main/LICENSE"
+    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/ef9808f71090d0db3eda99e2af2ba78f1086f4fb/LICENSE"
   },
   {
     "server": "time",
@@ -35,7 +35,7 @@
     "version": "2.0.1",
     "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/everything",
     "licence": "MIT AND Apache-2.0",
-    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/main/LICENSE"
+    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/ef9808f71090d0db3eda99e2af2ba78f1086f4fb/LICENSE"
   },
   {
     "server": "sequential-thinking",
@@ -44,7 +44,7 @@
     "version": "2.0.0",
     "source": "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking",
     "licence": "MIT AND Apache-2.0",
-    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/main/LICENSE"
+    "licence_url": "https://raw.githubusercontent.com/modelcontextprotocol/servers/ef9808f71090d0db3eda99e2af2ba78f1086f4fb/LICENSE"
   },
   {
     "server": "fetch",
