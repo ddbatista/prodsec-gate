@@ -34,35 +34,49 @@ import _cli                      # noqa: E402
 
 # --- Keyword heuristics: name + description -> trifecta capabilities ----------
 # Deliberately conservative & legible. Tuned against the real-server corpus
-# (corpus/, `eval_adapter.py --servers corpus/servers`) under two rules, so the
-# list does not just memorise twenty servers:
-#   * a word is ADDED only when, on keyword evidence alone, it catches more
-#     true legs than false ones on at least two servers, lowers no leg's
-#     recall, and gates no server whose labels would SHIP;
-#   * a word is NARROWED or DROPPED only for a false positive in the corpus,
-#     and only when no leg's recall drops.
-# The recall ratchet in tests/test_corpus.py holds whatever this buys.
+# (corpus/, `eval_adapter.py --servers corpus/servers`), one word at a time:
+#   * a NEW word stays only if, on keyword evidence alone (openWorldHint
+#     ignored), it catches more true legs than false ones on at least two
+#     servers;
+#   * a PLURAL of a word already here stays only if the plural form itself
+#     catches more true legs than false ones in the corpus;
+#   * a word is NARROWED only for a named corpus false positive (below);
+#   * no change may lower any leg's recall or gate a server whose labels SHIP.
+# The corpus cannot show overfitting, so tests/test_patterns.py pins
+# descriptions from server kinds it lacks. The recall ratchet in
+# tests/test_corpus.py holds the result.
+
+# Publishing something addressed to people: the verb as a whole word, then the
+# object ("create a new issue", "add_issue_comment", "Create comment").
+PUBLISH = (r"(create|add|post|reply)[_ ](an? |new |the )*"
+           r"(issues?|comments?|reviews?|pull[_ ]requests?|merge[_ ]requests?)")
+
 SIGNALS = {
-    "untrusted_input": r"\b(fetch|https|browse|scrape|search|"
-                       r"rss|hook|email|inbox|messages?|comments?|reviews?|"
-                       r"tickets?|issues?|pages?|crawl|download|"
-                       r"contents?|logs?|commits?|blocks?|data source|research)\b",
-    "private_data":    r"\b(secrets?|credentials?|tokens?|password|"
-                       r"(api|secret|private|access|ssh) keys?|"
+    # http: not before "header" (everything/get-header-params reads a header)
+    "untrusted_input": r"\b(fetch|https?(?! header)|browse|scrape|search|"
+                       r"rss|hook|email|inbox|messages?|comment|reviews?|"
+                       r"ticket|issues?|page|crawl|download|"
+                       r"contents|commits?|research)\b",
+    # knowledge: only a knowledge base or graph (tavily_search: "beyond your
+    # knowledge cutoff")
+    "private_data":    r"\b(secret|credential|token|password|key|"
                        r"private|internal|kb|knowledge (base|graph)|customer|"
-                       r"users?|pii|profiles?|accounts?|repo|repository|repositories|"
+                       r"user|pii|profile|account|repo|repository|repositories|"
                        r"files?|database|query|read)\b",
-    # The last alternative is a verb followed by something addressed to
-    # people: opening an issue or posting a comment publishes it.
     "external_comms":  r"\b(send|email|post|publish|notify|upload|export|"
                        r"slack|sms|webhook|message|share|url|transmit|push|"
-                       r"(create|add|open|post|reply)[a-z_ ]{0,30}"
-                       r"(issue|comment|review|pull request|merge request))\b",
-    "state_change":    r"\b(write|update|create|delete|drop|remove|"
+                       + PUBLISH + r")\b",
+    "state_change":    r"\b(write|update|create|delete|drop|remove|modify|"
                        r"deploy|execute|exec|run|pay|transfer|charge|insert|"
-                       r"patch|revoke|grant|overwrite|sync|move|rename|"
-                       r"commit|push|merge|fork)\b",
+                       r"patch|revoke|grant|overwrite|sync|push)\b",
 }
+
+# A verb the description says the tool does NOT do is not a signal: "this does
+# not run or modify the monitor" describes a read. Strips the negator and the
+# verbs it governs ("run", "run or modify", "start, stop or modify").
+NEGATION = (r"\b(does not|do not|doesn't|don't|never|will not|won't|cannot|can't)"
+            r"( [a-z]+)((,| or| nor| and) [a-z]+)*")
+
 # Words that imply an action is hard/impossible to undo.
 IRREVERSIBLE = r"\b(delete|drop|remove|permanently|destroy|wipe|purge|" \
                r"deploy|pay|transfer|charge|revoke)\b"
@@ -72,6 +86,7 @@ def infer(tool):
     """Return (capabilities:set, reversible:bool|None, notes:list)."""
     text = ((tool.get("name", "") + " " + tool.get("description", "") + " " +
              tool.get("title", "")).lower())
+    text = re.sub(NEGATION, " ", text)
     caps = {cap for cap, pat in SIGNALS.items() if re.search(pat, text)}
 
     ann = tool.get("annotations", {}) or {}
