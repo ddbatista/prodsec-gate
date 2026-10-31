@@ -174,7 +174,7 @@ tools get which legs; see the [CHANGELOG](CHANGELOG.md).
 **Always `set -o pipefail`.** A shell pipeline reports only the *last* command's
 exit code, so an upstream fetch failure can be masked by a downstream success.
 
-## What it does not do
+## Limitations
 
 - **`--live` defaults to the Agent SDK**, which is Claude Code as a library and
   therefore ships Bash, Read, Write and WebFetch. It is caged to zero tools and
