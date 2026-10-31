@@ -30,7 +30,8 @@ python3 gate.py mcp-dump.json --json | python3 triage.py -   # grade the manifes
 `gate.py --json`: same manifest, a warning on stderr, and always exit `0`
 (manifest produced) or `2` (not), never `1`.
 
-No dependencies — Python 3 stdlib only. Exit code is `1` for GATE/REVIEW so it
+No dependencies — Python 3 stdlib only. `triage.py` requires its manifest
+argument; pass `-` for stdin. Exit code is `1` for GATE/REVIEW so it
 can fail a CI pipeline; `0` for SHIP; `2` when nothing was audited (bad input,
 no tools, or a crash) -- never a pass.
 
@@ -73,8 +74,18 @@ raises an ASI03 least-privilege finding.
 
 ## Getting a real `tools/list` dump
 
-Use the official **MCP Inspector** — it does the `initialize` → `tools/list`
-JSON-RPC handshake for you. Two cases depending on how the server ships:
+Use [`prodsec-fetch`](../docs/prodsec-fetch.md). It does the `initialize` →
+`tools/list` handshake, follows pagination, and works with Python servers too:
+
+```sh
+set -o pipefail
+prodsec-fetch --i-will-execute-this --stdio npx -y <server-pkg> > <server>.tools.json
+prodsec-fetch --http https://example.com/mcp --header "Authorization: Bearer $TOK" > <server>.tools.json
+prodsec-gate <server>.tools.json
+```
+
+The official **MCP Inspector** works too. Two cases depending on how the
+server ships:
 
 **Local stdio server** (Inspector launches it as a child process):
 ```sh
@@ -97,6 +108,12 @@ npx @modelcontextprotocol/inspector   # web UI: Transport=HTTP, set URL, auth, o
 Either way: export the JSON, then feed it to `gate.py` (or `prodsec-gate`).
 
 ## Roadmap (where this is going)
-- Ingest real configs (MCP server tool lists, framework agent definitions) instead of hand-written manifests.
+- `prodsec-mcp-config`: vet a `.mcp.json` server config (commands, args, env)
+  rather than a `tools/list` dump.
+- A second labeller on a sample of the corpus, to measure agreement between
+  labellers and tighten every figure.
+- Corpus capture on Linux (`bwrap --unshare-net`); today it needs macOS
+  `sandbox-exec`.
+- Framework agent definitions as input, not only hand-written manifests.
 - Cover more of the OWASP ASI set (memory poisoning, inter-agent comms).
-- Emit SARIF/JSON for CI dashboards.
+- Emit SARIF for CI dashboards (JSON exists: `prodsec-gate --json`).

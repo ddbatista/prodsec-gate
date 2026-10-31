@@ -14,6 +14,11 @@ coding agent on your own machine, and threat-model a whole system with
   framework for agentic AI. Here it is a constrained prompt plus a scorer that
   checks every finding's citation against the code.
 
+The gate measures itself. On 20 real public MCP servers (222 tools, labelled
+by hand) the offline keyword floor finds **65.3%** of trifecta legs, and it
+gates every server labelled GATE. Every verdict prints that figure, and a
+ratchet in CI keeps it from going down ([corpus/](corpus/README.md)).
+
 ## Install
 
 ```sh
@@ -61,6 +66,20 @@ prodsec-fetch --http https://example.com/mcp --header "Authorization: Bearer $TO
 
 # Local stdio server (this RUNS the server's code, so use a sandbox for unknown servers):
 prodsec-fetch --i-will-execute-this --stdio npx -y @scope/server | prodsec-gate -
+
+# Python servers work too:
+pip install mcp-server-time
+prodsec-fetch --i-will-execute-this --stdio python3 -m mcp_server_time | prodsec-gate -
+```
+
+Every verdict ends with an `INSTRUMENT` block that says what produced it:
+
+```
+ INSTRUMENT
+  keyword floor only  ·  classifier NOT run  ·  --live adds it
+  floor recall on the real-server corpus (20 servers, 222 tools): 65.3%
+  so SHIP here means 'no keyword matched', NOT 'no capability'.
+  reads DECLARATIONS (name/description), never behaviour.
 ```
 
 The demo server is built to fool the offline gate. One tool forwards customer
@@ -93,7 +112,30 @@ prodsec-audit --agent claude          # or codex, cursor, all
 prodsec-allowlist                     # grade the Claude Code allow-list by blast radius
 ```
 
-### 2. MAESTRO: do we understand this whole system?
+### 2. How good is the gate? Measure it
+
+The detection figures come from a corpus of real servers in
+[`corpus/`](corpus/README.md). Each tool there is labelled with its legs, and
+each server with the verdict a careful reviewer would give it:
+
+```sh
+python3 tooling/eval_adapter.py --servers corpus/servers   # recall, precision, GATE rates, every miss
+python3 -m unittest tests.test_corpus                      # schema + the recall ratchet
+```
+
+The report gives per-leg recall and precision. Its 95% intervals resample
+whole servers, because tools on one server get missed together. It also
+counts how many servers labelled GATE are gated and how many labelled SHIP
+are wrongly blocked. Each disagreement is classified as a **detection** bug
+(the legs were wrong) or a **policy** question (right legs, disputed
+verdict), so a policy question is never "fixed" by weakening a pattern.
+
+To add a server, add it to `corpus/sources.json` and run
+`python3 corpus/capture.py <name>`. On macOS this runs the server under a
+sandbox. Label its tools by the rules in `corpus/README.md`, then regenerate
+the baseline and review the diff.
+
+### 3. MAESTRO: do we understand this whole system?
 
 The slow pass, an afternoon per system. Full guide in
 [docs/maestro-pass.md](docs/maestro-pass.md).
@@ -139,10 +181,14 @@ exit code, so an upstream fetch failure can be masked by a downstream success.
   the cage is verified before each run — but that cage is load-bearing, and
   the union-never-subtract ratchet does **not** cover it: the ratchet bounds
   the verdict, not the host ([why](docs/design-notes.md#sdk-lockdown)). `--backend api` has no tool surface to cage.
-- **Offline, it misses egress phrased in vocabulary the patterns don't know.**
-  A tool described as "forwards the selected customer record to our partner
-  endpoint" grades `SHIP` at 2 legs. `--live` closes this; the offline default
-  ships with the hole, on purpose and documented.
+- **Offline, it misses about a third of legs on real servers.** The keyword
+  floor's recall is 65.3% on the corpus, and the patterns were tuned on that
+  same corpus, so read the figure as an upper bound. `untrusted_input` is
+  found 93% of the time; `private_data`, `external_comms` and `state_change`
+  only about half the time each. A tool described
+  as "forwards the selected customer record to our partner endpoint" grades
+  `SHIP` at 2 legs. `--live` closes this; the offline default ships with the
+  hole, on purpose and documented.
 - **It reads declarations, not behaviour.** `tools/list` is what a server *says*
   it does, written by the server operator, who may be the attacker.
 - **It cannot see intent.** A deliberately-vulnerable test fixture and a
@@ -156,6 +202,7 @@ python3 tooling/audit_agent_config.py --self-test     # 12/12
 python3 tooling/audit_allowlist.py  --self-test       # 15/15, then 11/11
 python3 tooling/policy_guard_hook.py --self-test      # 22/22
 python3 tooling/maestro_score.py    --self-test       # 12/12
+python3 tooling/eval_adapter.py --servers corpus/servers   # detection on 20 real servers
 
 # end to end, with no third-party code (the demo is built to SHIP wrongly offline):
 set -o pipefail
