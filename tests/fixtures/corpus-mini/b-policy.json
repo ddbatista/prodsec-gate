@@ -1,0 +1,29 @@
+{
+  "server": "b-policy",
+  "package": "example-b-policy",
+  "registry": "npm",
+  "version": "1.0.0",
+  "source": "https://example.invalid/repo",
+  "licence": "MIT",
+  "captured": "2026-10-27",
+  "capture_method": "sandboxed-stdio",
+  "tools": [
+    {
+      "name": "t3",
+      "description": "synthetic"
+    }
+  ],
+  "labels": {
+    "t3": {
+      "capabilities": [
+        "untrusted_input",
+        "private_data",
+        "external_comms"
+      ],
+      "reversible": null,
+      "why": "synthetic"
+    }
+  },
+  "expected_verdict": "SHIP",
+  "rationale": "synthetic fixture for the eval's own tests"
+}

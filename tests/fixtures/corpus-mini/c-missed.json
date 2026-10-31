@@ -1,0 +1,27 @@
+{
+  "server": "c-missed",
+  "package": "example-c-missed",
+  "registry": "npm",
+  "version": "1.0.0",
+  "source": "https://example.invalid/repo",
+  "licence": "MIT",
+  "captured": "2026-10-27",
+  "capture_method": "sandboxed-stdio",
+  "tools": [
+    {
+      "name": "t4",
+      "description": "synthetic"
+    }
+  ],
+  "labels": {
+    "t4": {
+      "capabilities": [
+        "state_change"
+      ],
+      "reversible": false,
+      "why": "synthetic"
+    }
+  },
+  "expected_verdict": "GATE",
+  "rationale": "synthetic fixture for the eval's own tests"
+}
