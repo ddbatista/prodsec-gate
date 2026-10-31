@@ -124,9 +124,14 @@ becomes fail-closed, which becomes GATE — never a silent pass.
   `name`/`description` this tool reads are written by the same party.
 - **No intent model.** A deliberately-vulnerable fixture grades like a
   dangerous production server.
-- **Offline recall is bounded by the keyword patterns.** Measured on a
-  12-tool labelled corpus: **62.5%**. With the classifier signal: 100% against
-  a stand-in, unmeasured against a real model (`tooling/eval_adapter.py`).
+- **Offline recall is bounded by the keyword patterns.** Measured on the
+  real-server corpus (20 public MCP servers, 222 hand-labelled tools, see
+  [`corpus/`](../corpus/README.md)): **65.3%** of legs, 95% interval 54.3–75.5%
+  resampling servers; precision 57.9%. Every server labelled GATE is gated;
+  1 of 8 labelled SHIP is wrongly blocked. The patterns were tuned on the same
+  corpus, so read these as an upper bound. With the classifier signal: 100%
+  on the 12-tool hand-written corpus against a stand-in, unmeasured against a
+  real model (`tooling/eval_adapter.py`).
 - **The default is the floor, and the report now says so.** Every run prints an
   `INSTRUMENT` block naming what produced the verdict — `keyword floor only ·
   classifier NOT run` plus the recall figure above, or, with `--live`, the

@@ -6,6 +6,7 @@ the suite because every self-test exits non-zero on any failure.
 """
 import json
 import os
+import re
 import sys
 import unittest
 
@@ -73,6 +74,17 @@ class SelfTests(unittest.TestCase):
         # keyword baseline -- the union-never-subtract property, measured.
         p = run("eval_adapter")
         self.assertEqual(p.returncode, 0, p.stdout[-2000:] + p.stderr)
+
+
+class MaestroExamples(unittest.TestCase):
+
+    def test_bad_example_shows_each_failure_class(self):
+        # README promises: MISPLACED + FABRICATED + DROPPED, exit 1.
+        p = run("maestro_score", os.path.join("examples", "maestro-pass-bad.json"),
+                "--root", ".")
+        self.assertEqual(p.returncode, GATE, p.stdout + p.stderr)
+        for label in ("MOVE", "FAB!", "DROP"):
+            self.assertRegex(p.stdout, r"\[%s\]" % re.escape(label))
 
 
 class PathGuardFalsifier(unittest.TestCase):

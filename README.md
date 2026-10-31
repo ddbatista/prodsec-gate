@@ -126,8 +126,8 @@ under a wrong scenario, and the scorer cannot tell.
 **A gate that passes when it did not run is worse than no gate, because
 something downstream believes it** — so every command exits `2` when it could
 not look ([the story](docs/design-notes.md#exit-2-not-audited)). Upgrading
-from v0.1.x? Several codes changed in v0.2.0; see the
-[CHANGELOG](CHANGELOG.md#behaviour-changes).
+from v0.1.x? Several codes changed in v0.2.0, and v0.3.0 changed which
+tools get which legs; see the [CHANGELOG](CHANGELOG.md).
 
 **Always `set -o pipefail`.** A shell pipeline reports only the *last* command's
 exit code, so an upstream fetch failure can be masked by a downstream success.

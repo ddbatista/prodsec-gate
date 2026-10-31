@@ -1,5 +1,80 @@
 # Changelog
 
+## v0.3.0
+
+Detection is now measured on real MCP servers, and the keyword floor is tuned
+against them. **Verdicts can change:** the keyword patterns are different, so
+some tools gain or lose legs. Read the table before upgrading a required
+check.
+
+### The keyword floor on the real-server corpus
+
+20 public MCP servers, 222 tools, labelled by hand (`corpus/`). v0.2.0 was
+measured on the same corpus with its own patterns.
+
+| | v0.2.0 | v0.3.0 |
+|---|---|---|
+| Recall, all legs | 173/303 (57.1%) | 198/303 (65.3%) |
+| 95% interval (resampling servers) | 46.3–67.9% | 54.3–75.5% |
+| `untrusted_input` recall | 84/99 | 92/99 |
+| `private_data` recall | 29/74 | 37/74 |
+| `external_comms` recall | 18/48 | 25/48 |
+| `state_change` recall | 42/82 | 44/82 |
+| Precision, all legs | 173/318 (54.4%) | 198/342 (57.9%) |
+| Servers labelled GATE that are gated | 12/12 | 12/12 |
+| Servers labelled SHIP that are blocked | 2/8 (fetch, tavily) | 1/8 (fetch) |
+
+Precision rises on every leg, as does recall. The patterns were tuned on this
+same corpus, so treat v0.3.0's figures as an upper bound;
+`tests/test_patterns.py` pins descriptions from server kinds the corpus lacks.
+On the 12-tool hand-written corpus nothing changed (62.5% recall, 47.6%
+precision).
+
+### Behaviour changes
+
+- **Keyword patterns** (`mcp_adapter.SIGNALS`), so some legs change:
+  - **New words:** `contents`, `commits` and `research` for untrusted input,
+    `push` as a state change, and publishing phrases as egress (create, add,
+    post or reply followed by an issue, comment, review, or pull or merge
+    request).
+  - **New plurals:** `messages`, `reviews`, `issues`, `files`,
+    `repositories`.
+  - **Narrowed `http`:** it no longer fires before "header".
+  - **Narrowed `knowledge`:** only a knowledge base or graph counts.
+  - **Negations:** a verb the description negates ("does not run or
+    modify") is no longer a signal.
+- **The `INSTRUMENT` block and the `--json` manifest** report floor recall
+  measured on the real corpus, `65.3%` with `floor_corpus: "20 servers, 222
+  tools"`. v0.2.0 reported `62.5%` from the 12-tool corpus.
+- **`prodsec-fetch`**
+  - **Waits for each answer before sending the next request.** Python MCP
+    servers shut down on EOF and drop the request in flight, so every Python
+    stdio server returned nothing before.
+  - **Follows `tools/list` pagination** (`nextCursor`). It used to return only
+    the first page.
+  - **Better errors:** they say which step failed and include the tail of the
+    server's stderr.
+- **Unchanged:** a tool that declares no `openWorldHint` still counts as
+  untrusted input. Treating it as unknown cut `untrusted_input` recall from
+  92/99 to 72/99, so it did not ship (#13).
+
+### Other changes
+
+- **`corpus/`:** the real-server corpus, with its schema and labelling rules,
+  a capture script that runs each server under a macOS `sandbox-exec` profile,
+  and a fingerprinted recall baseline.
+- **`eval_adapter.py --servers corpus/servers`** reports:
+  - per-leg recall and precision, with intervals that resample servers
+  - per-server averages
+  - GATE recall on servers labelled GATE, and the GATE rate on servers
+    labelled SHIP
+  - every mismatch, classified as detection, policy or both
+- **The recall ratchet** (`tests/test_corpus.py`) fails if any leg's recall,
+  or the share of servers labelled GATE that are gated, drops below the
+  committed baseline.
+- **`examples/maestro-pass-bad.json`** shows MISPLACED again, as the README
+  says. Its quote had drifted and it reported FABRICATED instead.
+
 ## v0.2.0
 
 One exit-code contract for every command, a test suite, and command-surface

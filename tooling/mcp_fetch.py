@@ -41,7 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _cli                      # noqa: E402
 
 PROTOCOL = "2025-06-18"
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 CLIENT = {"name": "prodsec-gate", "version": VERSION}
 
 

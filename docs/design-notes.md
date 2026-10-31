@@ -187,9 +187,11 @@ grades SHIP *wrongly*.
 `relay_to_partner` that "forwards the selected customer record to our partner
 endpoint" gets no `external_comms`, because "relay", "forward" and "partner" are
 in none of the patterns; the manifest reports two legs and triage prints SHIP. On
-the 12-tool labelled corpus the floor's recall is 62.5%. That is what the
+the 12-tool labelled corpus the floor's recall was 62.5%. That is what the
 classifier signal is for — and why it had to be designed so it could not make
-things worse.
+things worse. (In v0.3.0 I measured it on 20 real servers instead: 57.1%
+before tuning the patterns against them, 65.3% after. `relay_to_partner` is
+still missed: none of its words were worth adding.)
 
 <a id="union-never-subtract"></a>
 ### Union, never subtract
