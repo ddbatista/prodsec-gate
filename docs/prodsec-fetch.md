@@ -21,11 +21,19 @@ REFUSED: --stdio runs the server's own code on this machine,
 which is the thing you have not vetted yet.
 ```
 
-Do the first fetch of an unknown server inside the sandbox:
+Do the first fetch of an unknown server inside a sandbox. Two ways:
 
 ```sh
+# Claude Code's sandbox, around the whole session:
 claude --settings '{"sandbox":{"enabled":true,"allowUnsandboxedCommands":false}}'
 ```
+
+On macOS, [`corpus/sandbox.sb`](../corpus/sandbox.sb) is the profile the
+real-server corpus was captured under. It allows no network, no Mach services
+or AppleEvents, and runs only the server's runtime and git. It blocks reads of
+user data and allows writes only in a scratch directory.
+[`corpus/capture.py`](../corpus/capture.py) shows how to run a pinned package
+under it, installed with scripts disabled.
 
 HTTP servers execute nothing locally — but you may be handing an unvetted
 endpoint an auth token, which is the same trade from the other side.
@@ -35,6 +43,10 @@ endpoint an auth token, which is the same trade from the other side.
 ```sh
 # stdio — RUNS the server
 prodsec-fetch --i-will-execute-this --stdio npx -y @scope/server > dump.json
+
+# a Python server works the same way (install it first)
+pip install mcp-server-time
+prodsec-fetch --i-will-execute-this --stdio python3 -m mcp_server_time > time.tools.json
 
 # HTTP — nothing executes locally
 prodsec-fetch --http https://example.com/mcp > dump.json
@@ -54,15 +66,23 @@ prodsec-fetch --i-will-execute-this --stdio python3 examples/demo_mcp_server.py 
 
 ## Wire format
 
-Newline-delimited JSON-RPC, three messages:
+Newline-delimited JSON-RPC, one request at a time:
 
 ```
 --> initialize                 (protocolVersion 2025-06-18)
+<-- result
 --> notifications/initialized
 --> tools/list
+<-- result                     (and, while it carries nextCursor:)
+--> tools/list {cursor}
+<-- result
 ```
 
-Emits the raw `tools/list` response, which `prodsec-gate` consumes directly.
+stdin stays open until the last answer arrives. A client that writes all
+three messages and hangs up gets nothing from a Python MCP server: the SDK
+shuts down on EOF and drops the request still in flight. Pages are followed
+and merged, so the output is one `tools/list` response holding every tool,
+which `prodsec-gate` consumes directly.
 
 ## Errors you will actually hit
 
@@ -81,6 +101,11 @@ claude mcp login <name>
 # then pass the token yourself:
 prodsec-fetch --http <url> --header "Authorization: Bearer $TOK"
 ```
+
+**`server exited before answering initialize`** — the server crashed on
+start, usually because of a missing token or config. The tail of its stderr
+follows the message. `server did not answer tools/list within 30s` and
+`server answered tools/list with an error: …` name the step the same way.
 
 **Empty output into `prodsec-gate`** — the fetch failed and the pipe swallowed
 it. Shells report only the last command's exit code. **`set -o pipefail`.**

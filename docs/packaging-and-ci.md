@@ -47,11 +47,16 @@ Runs the **offline path only**. The rule it encodes:
 > classifier is none of those. **A gate that fails because someone's API quota
 > ran out teaches people to bypass gates.**
 
-Three steps, in this order, because the order is the argument:
+It runs on Python 3.9 to 3.13, the versions `requires-python` claims. The
+steps run in this order, because the order is the argument:
 
-1. **Self-tests** — a tool whose own tests fail has no standing to grade anything.
-2. **End-to-end smoke** — fetch from the bundled demo server and gate it.
-3. **Known-vulnerable fixture must GATE** — `tooling/mcp-dump.json` must exit
+1. **Test suite** — `python -m unittest discover`. This includes the recall
+   ratchet on the real-server corpus: a pattern change that loses a leg the
+   committed baseline catches, or ungates a server labelled GATE, fails here
+   ([corpus/](../corpus/README.md)).
+2. **Self-tests** — a tool whose own tests fail has no standing to grade anything.
+3. **End-to-end smoke** — fetch from the bundled demo server and gate it.
+4. **Known-vulnerable fixture must GATE** — `tooling/mcp-dump.json` must exit
    exactly `1`. A `0` means detection regressed; a `2` means the check did not
    run. In a consuming repo, gate your real dumps instead, where `exit 2` fails
    the build as hard as `exit 1`.
