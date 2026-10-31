@@ -33,27 +33,40 @@ precision).
 ### Behaviour changes
 
 - **Keyword patterns** (`mcp_adapter.SIGNALS`), so some legs change:
-  - **New words:** `contents`, `commits` and `research` for untrusted input,
-    `push` as a state change, and publishing phrases as egress (create, add,
-    post or reply followed by an issue, comment, review, or pull or merge
-    request).
-  - **New plurals:** `messages`, `reviews`, `issues`, `files`,
-    `repositories`.
+  - **New words:**
+    - `untrusted_input`: `contents`, `commit` or `commits`, `research`
+    - `state_change`: `push`
+    - `external_comms`: a publishing phrase (create, add, post or reply
+      followed by an issue, comment, review, or pull or merge request)
+  - **New plurals:**
+    - `untrusted_input`: `messages`, `reviews`, `issues`
+    - `private_data`: `files`, `repositories`
+    - `external_comms` still matches only `message`.
   - **Narrowed `http`:** it no longer fires before "header".
   - **Narrowed `knowledge`:** only a knowledge base or graph counts.
-  - **Negations:** a verb the description negates ("does not run or
-    modify") is no longer a signal.
+  - **Negations:** words a description negates are dropped before any
+    check. "Does not run or modify the monitor" no longer counts toward a
+    leg, the irreversibility check, or the `readOnlyHint` contradiction
+    check.
 - **The `INSTRUMENT` block and the `--json` manifest** report floor recall
-  measured on the real corpus, `65.3%` with `floor_corpus: "20 servers, 222
-  tools"`. v0.2.0 reported `62.5%` from the 12-tool corpus.
+  measured on the real corpus.
+  - **INSTRUMENT line:** v0.2.0 printed `floor recall on the 12-tool corpus:
+    62.5%`. It now prints `floor recall on the real-server corpus (20 servers,
+    222 tools): 65.3%`. Update anything that parses it.
+  - **`--json` manifest:** `instrument.floor_recall_on_corpus` is now
+    `"65.3%"`, and a new field, `instrument.floor_corpus`, holds `"20
+    servers, 222 tools"`.
 - **`prodsec-fetch`**
-  - **Waits for each answer before sending the next request.** Python MCP
-    servers shut down on EOF and drop the request in flight, so every Python
-    stdio server returned nothing before.
+  - **Waits for each answer before sending the next request.** The Python
+    MCP SDK shuts down on EOF and drops the request in flight. Before this,
+    the reference Python servers (time, fetch, git) returned no tools.
   - **Follows `tools/list` pagination** (`nextCursor`). It used to return only
     the first page.
-  - **Better errors:** they say which step failed and include the tail of the
-    server's stderr.
+  - **New error messages:** they name the step that failed and include the
+    tail of the server's stderr, for example `server exited before answering
+    initialize`. The old `no tools/list response` message is gone. A
+    JSON-RPC error reply now fails with `server answered tools/list with an
+    error: …`.
 - **Unchanged:** a tool that declares no `openWorldHint` still counts as
   untrusted input. Treating it as unknown cut `untrusted_input` recall from
   92/99 to 72/99, so it did not ship (#13).
@@ -63,12 +76,17 @@ precision).
 - **`corpus/`:** the real-server corpus, with its schema and labelling rules,
   a capture script that runs each server under a macOS `sandbox-exec` profile,
   and a fingerprinted recall baseline.
-- **`eval_adapter.py --servers corpus/servers`** reports:
-  - per-leg recall and precision, with intervals that resample servers
-  - per-server averages
-  - GATE recall on servers labelled GATE, and the GATE rate on servers
-    labelled SHIP
-  - every mismatch, classified as detection, policy or both
+- **`eval_adapter.py --servers corpus/servers`** exits 0 on any result (the
+  ratchet lives in the tests) and 2 on an invalid corpus.
+  - `--write-baseline FILE` records the floor and the corpus fingerprint.
+    Without `--servers` it exits 2.
+  - The report lists every missed leg (`MISS`) and every policy dispute a
+    detection miss hides (`POLICY`). It also reports:
+    - per-leg recall and precision, with intervals that resample servers
+    - per-server averages
+    - GATE recall on servers labelled GATE, and the GATE rate on servers
+      labelled SHIP
+    - every mismatch, classified as detection, policy or both
 - **The recall ratchet** (`tests/test_corpus.py`) fails if any leg's recall,
   or the share of servers labelled GATE that are gated, drops below the
   committed baseline.
@@ -81,7 +99,7 @@ One exit-code contract for every command, a test suite, and command-surface
 fixes. **No keyword or verdict changes:** the keyword patterns and the
 triage rules are untouched, and the adapter eval's output is byte-identical to
 v0.1.1. The `--live` reply parser did change; see the last item under
-[Behaviour changes](#behaviour-changes).
+[Behaviour changes](#behaviour-changes-1).
 
 ### The contract
 
