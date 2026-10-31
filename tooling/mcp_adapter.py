@@ -33,19 +33,35 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _cli                      # noqa: E402
 
 # --- Keyword heuristics: name + description -> trifecta capabilities ----------
-# Deliberately conservative & legible. Tune these against real servers.
+# Deliberately conservative & legible. Tuned against the real-server corpus
+# (corpus/, `eval_adapter.py --servers corpus/servers`) under two rules, so the
+# list does not just memorise twenty servers:
+#   * a word is ADDED only when, on keyword evidence alone, it catches more
+#     true legs than false ones on at least two servers, lowers no leg's
+#     recall, and gates no server whose labels would SHIP;
+#   * a word is NARROWED or DROPPED only for a false positive in the corpus,
+#     and only when no leg's recall drops.
+# The recall ratchet in tests/test_corpus.py holds whatever this buys.
 SIGNALS = {
-    "untrusted_input": r"\b(fetch|http|https|browse|scrape|search|"
-                       r"rss|hook|email|inbox|message|comment|review|"
-                       r"ticket|issue|page|crawl|download)\b",
-    "private_data":    r"\b(secret|credential|token|password|key|private|"
-                       r"internal|kb|knowledge|customer|user|pii|profile|"
-                       r"account|repo|repository|file|database|query|read)\b",
+    "untrusted_input": r"\b(fetch|https|browse|scrape|search|"
+                       r"rss|hook|email|inbox|messages?|comments?|reviews?|"
+                       r"tickets?|issues?|pages?|crawl|download|"
+                       r"contents?|logs?|commits?|blocks?|data source|research)\b",
+    "private_data":    r"\b(secrets?|credentials?|tokens?|password|"
+                       r"(api|secret|private|access|ssh) keys?|"
+                       r"private|internal|kb|knowledge (base|graph)|customer|"
+                       r"users?|pii|profiles?|accounts?|repo|repository|repositories|"
+                       r"files?|database|query|read)\b",
+    # The last alternative is a verb followed by something addressed to
+    # people: opening an issue or posting a comment publishes it.
     "external_comms":  r"\b(send|email|post|publish|notify|upload|export|"
-                       r"slack|sms|webhook|message|share|url|transmit|push)\b",
-    "state_change":    r"\b(write|update|create|delete|drop|remove|modify|"
+                       r"slack|sms|webhook|message|share|url|transmit|push|"
+                       r"(create|add|open|post|reply)[a-z_ ]{0,30}"
+                       r"(issue|comment|review|pull request|merge request))\b",
+    "state_change":    r"\b(write|update|create|delete|drop|remove|"
                        r"deploy|execute|exec|run|pay|transfer|charge|insert|"
-                       r"patch|revoke|grant|overwrite|sync)\b",
+                       r"patch|revoke|grant|overwrite|sync|move|rename|"
+                       r"commit|push|merge|fork)\b",
 }
 # Words that imply an action is hard/impossible to undo.
 IRREVERSIBLE = r"\b(delete|drop|remove|permanently|destroy|wipe|purge|" \

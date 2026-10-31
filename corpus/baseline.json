@@ -8,23 +8,23 @@
   },
   "floor_recall": {
     "untrusted_input": {
-      "tp": 84,
+      "tp": 94,
       "n": 99
     },
     "private_data": {
-      "tp": 29,
+      "tp": 38,
       "n": 74
     },
     "external_comms": {
-      "tp": 18,
+      "tp": 25,
       "n": 48
     },
     "state_change": {
-      "tp": 42,
+      "tp": 49,
       "n": 82
     },
     "overall": {
-      "tp": 173,
+      "tp": 206,
       "n": 303
     }
   }
