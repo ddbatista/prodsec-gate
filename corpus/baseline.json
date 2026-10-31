@@ -2,6 +2,10 @@
   "servers": 20,
   "tools": 222,
   "corpus_sha256": "6445bf826eacc2ffd7d6e039e5a0e98e8e2cef81b17faa983c16ac29be1acb3a",
+  "gate_recall": {
+    "gated": 12,
+    "n": 12
+  },
   "floor_recall": {
     "untrusted_input": {
       "tp": 84,

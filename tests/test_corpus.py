@@ -137,8 +137,46 @@ class Metrics(unittest.TestCase):
         # whatever the detector derived: a miss can make a dispute look settled.
         self.assertEqual(self.m["policy_disputes"], ["b-policy", "e-both"])
 
+    def test_per_server_averages(self):
+        # Overall recall per server: a 2/2, b 3/3, c 0/1, e 3/3; d has no legs
+        # and is left out. Precision: a 2/3, b 3/3, e 3/4; c and d inferred
+        # nothing and are left out.
+        self.assertAlmostEqual(self.m["macro"]["overall"]["recall"], 3 / 4)
+        self.assertAlmostEqual(self.m["macro"]["overall"]["precision"],
+                               (2 / 3 + 1 + 3 / 4) / 3)
+
+    def test_servers_labelled_gate_stay_gated(self):
+        # Only c is labelled GATE, and the fake detector misses its state change.
+        self.assertEqual(self.m["gate_recall"], {"gated": 0, "n": 1})
+
     def test_misses_name_the_tool(self):
         self.assertEqual(self.m["misses"], [("c-missed", "t4", ["state_change"])])
+
+
+class ServerIntervals(unittest.TestCase):
+    """Tools on one server share a writer and get missed together, so the
+    unit of resampling is the server, not the tool."""
+
+    def setUp(self):
+        self.servers = E.load_servers(MINI)
+
+    def interval(self, servers, seed=0):
+        m = E.corpus_metrics(servers, infer=fake_infer)
+        return E.server_interval(m["per_server"], "overall", E.recall, seed=seed)
+
+    def test_collapses_when_every_server_scores_the_same(self):
+        perfect = [fx for fx in self.servers if fx["server"] in ("a-detection", "b-policy", "e-both")]
+        self.assertEqual(self.interval(perfect), (1.0, 1.0))
+
+    def test_brackets_the_pooled_value_and_spans_the_server_spread(self):
+        lo, hi = self.interval(self.servers)
+        self.assertLessEqual(lo, 8 / 9)
+        self.assertGreaterEqual(hi, 8 / 9)
+        self.assertLess(lo, 0.8)        # c scores 0/1; resamples heavy in c pull it down
+        self.assertEqual(hi, 1.0)       # resamples without c are perfect
+
+    def test_is_reproducible(self):
+        self.assertEqual(self.interval(self.servers, seed=7), self.interval(self.servers, seed=7))
 
 
 class Ratchet(unittest.TestCase):
@@ -155,6 +193,15 @@ class Ratchet(unittest.TestCase):
                     "recall on %s dropped below the committed baseline %d/%d; "
                     "a pattern change may not buy precision with missed GATEs"
                     % (leg, base["tp"], base["n"]))
+
+    def test_servers_labelled_gate_never_drop_below_the_baseline(self):
+        m = E.corpus_metrics(E.load_servers(CORPUS))
+        base = json.load(open(BASELINE))["gate_recall"]
+        self.assertGreaterEqual(
+            m["gate_recall"]["gated"] / m["gate_recall"]["n"],
+            base["gated"] / base["n"] - 1e-9,
+            "fewer servers labelled GATE are gated than the baseline %d/%d"
+            % (base["gated"], base["n"]))
 
     def test_baseline_was_measured_on_this_corpus(self):
         # Recall on a different corpus is a different number. A changed corpus
@@ -184,8 +231,9 @@ class EvalCli(unittest.TestCase):
     def test_servers_mode_prints_the_report(self):
         p = run("eval_adapter", "--servers", MINI)
         self.assertEqual(p.returncode, 0, p.stderr)
-        for heading in ("recall", "precision", "GATE rate on acceptable servers",
-                        "MISMATCH"):
+        for heading in ("RECALL", "PRECISION", "GATE rate on acceptable servers",
+                        "GATE recall on servers labelled GATE", "per server",
+                        "bootstrap over servers", "MISMATCH"):
             self.assertIn(heading, p.stdout)
 
     def test_servers_mode_rejects_an_invalid_corpus(self):

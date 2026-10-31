@@ -26,6 +26,7 @@ import importlib.util
 import json
 import math
 import os
+import random
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -239,11 +240,52 @@ def _verdict(tools):
 
 
 def recall(c):
-    return c["tp"] / (c["tp"] + c["fn"]) if c["tp"] + c["fn"] else 1.0
+    """None when nothing was labelled: no evidence either way."""
+    return c["tp"] / (c["tp"] + c["fn"]) if c["tp"] + c["fn"] else None
 
 
 def precision(c):
-    return c["tp"] / (c["tp"] + c["fp"]) if c["tp"] + c["fp"] else 1.0
+    """None when nothing was inferred."""
+    return c["tp"] / (c["tp"] + c["fp"]) if c["tp"] + c["fp"] else None
+
+
+LEGS = tuple(A.CAP_VOCAB) + ("overall",)
+
+
+def _add(into, c):
+    for k in ("tp", "fp", "fn"):
+        into[k] += c[k]
+
+
+def _zero():
+    return {"tp": 0, "fp": 0, "fn": 0}
+
+
+def server_interval(per_server, leg, stat, resamples=2000, seed=0, level=0.95):
+    """A bootstrap interval that resamples SERVERS, not tools.
+
+    Tools on one server share a writer, so they are missed together; treating
+    them as independent (as a Wilson interval on the pooled count does) makes
+    the interval too narrow. Each resample draws len(servers) servers with
+    replacement and pools their counts. Draws where the statistic is
+    undefined are skipped. Seeded, so the report is reproducible.
+    """
+    rng = random.Random(seed)
+    counts = [c[leg] for c in per_server.values()]
+    values = []
+    for _ in range(resamples):
+        pooled = _zero()
+        for c in rng.choices(counts, k=len(counts)):
+            _add(pooled, c)
+        v = stat(pooled)
+        if v is not None:
+            values.append(v)
+    if not values:
+        return None
+    values.sort()
+    tail = (1 - level) / 2
+    return (values[int(tail * len(values))],
+            values[min(len(values) - 1, int((1 - tail) * len(values)))])
 
 
 def corpus_metrics(servers, infer=None):
@@ -252,23 +294,23 @@ def corpus_metrics(servers, infer=None):
     infer(tool) -> (capabilities, reversible, notes), the shape of A.infer.
     """
     infer = infer or A.infer
-    caps = {c: {"tp": 0, "fp": 0, "fn": 0} for c in A.CAP_VOCAB}
+    caps = {c: _zero() for c in A.CAP_VOCAB}
+    per_server = {}
     misses, mismatches, disputes = [], [], []
-    gated = acceptable = 0
+    gated = acceptable = gate_kept = gate_n = 0
     for fx in servers:
         derived, oracle, legs_wrong = [], [], False
+        mine = per_server[fx["server"]] = {leg: _zero() for leg in LEGS}
         for tool in A.tools_of(fx["tools"]):
             lab = fx["labels"][tool["name"]]
             truth = set(lab["capabilities"])
             got, rev, _ = infer(tool)
             got = {c for c in got if c in A.CAP_VOCAB}
             for c in A.CAP_VOCAB:
-                if c in got and c in truth:
-                    caps[c]["tp"] += 1
-                elif c in got:
-                    caps[c]["fp"] += 1
-                elif c in truth:
-                    caps[c]["fn"] += 1
+                k = ("tp" if c in truth else "fp") if c in got else "fn" if c in truth else None
+                if k:
+                    for bucket in (caps[c], mine[c], mine["overall"]):
+                        bucket[k] += 1
             if truth - got:
                 misses.append((fx["server"], tool["name"], sorted(truth - got)))
             derived_rev = rev if "state_change" in got else None
@@ -282,6 +324,9 @@ def corpus_metrics(servers, infer=None):
         if want == "SHIP":
             acceptable += 1
             gated += d == "GATE"
+        else:
+            gate_n += 1
+            gate_kept += d == "GATE"
         if o != want:
             disputes.append(fx["server"])
         if d != want:
@@ -289,9 +334,21 @@ def corpus_metrics(servers, infer=None):
             mismatches.append({"server": fx["server"], "expected": want, "derived": d,
                                "oracle": o, "kind": kind})
     overall = {k: sum(c[k] for c in caps.values()) for k in ("tp", "fp", "fn")}
+
+    def mean(xs):
+        xs = [x for x in xs if x is not None]
+        return sum(xs) / len(xs) if xs else None
+
+    # Every server counts once, however many tools it has: a 28-tool server
+    # cannot outvote nineteen small ones.
+    macro = {leg: {"recall": mean(recall(c[leg]) for c in per_server.values()),
+                   "precision": mean(precision(c[leg]) for c in per_server.values())}
+             for leg in LEGS}
     return {"capabilities": caps, "overall": overall, "misses": misses,
+            "per_server": per_server, "macro": macro,
             "mismatches": mismatches, "policy_disputes": disputes,
             "gate_rate": {"gated": gated, "acceptable": acceptable},
+            "gate_recall": {"gated": gate_kept, "n": gate_n},
             "servers": len(servers),
             "tools": sum(len(A.tools_of(fx["tools"])) for fx in servers)}
 
@@ -304,18 +361,37 @@ def _rate(k, n):
                                                    lo * 100, hi * 100)
 
 
+def _pct(x):
+    return "  n/a" if x is None else "%5.1f%%" % (100 * x)
+
+
+def _table(m, stat, den):
+    print("  %-16s %-26s %-17s %s" % ("leg", "pooled over tools", "95% interval",
+                                     "per server"))
+    for leg in LEGS:
+        c = m["overall"] if leg == "overall" else m["capabilities"][leg]
+        ci = server_interval(m["per_server"], leg, stat)
+        print("  %-16s %3d/%-3d = %-14s %-17s %s" % (
+            leg, c["tp"], c["tp"] + c[den], _pct(stat(c)),
+            "[%s–%s]" % (_pct(ci[0]).strip(), _pct(ci[1]).strip()) if ci else "n/a",
+            _pct(m["macro"][leg][stat.__name__])))
+
+
 def report_corpus(m):
     print("=" * 74)
     print(" REAL-SERVER CORPUS · %d servers · %d tools · keyword floor"
           % (m["servers"], m["tools"]))
     print("=" * 74)
-    print("  %-16s %-34s %s" % ("leg", "recall", "precision"))
-    for name, c in list(m["capabilities"].items()) + [("overall", m["overall"])]:
-        print("  %-16s %-34s %s" % (name, _rate(c["tp"], c["tp"] + c["fn"]),
-                                     _rate(c["tp"], c["tp"] + c["fp"])))
-    print("\n  missed legs are missed GATEs; false legs cost a human a second look")
+    print("  Intervals: 95%, bootstrap over servers (tools on one server are")
+    print("  missed together). Per server: each server's own rate, averaged.")
+    print("\n  RECALL     missed legs are missed GATEs")
+    _table(m, recall, "fn")
+    print("\n  PRECISION  false legs cost a human a second look")
+    _table(m, precision, "fp")
+    g = m["gate_recall"]
+    print("\n  GATE recall on servers labelled GATE  %s" % _rate(g["gated"], g["n"]))
     g = m["gate_rate"]
-    print("\n  GATE rate on acceptable servers  %s" % _rate(g["gated"], g["acceptable"]))
+    print("  GATE rate on acceptable servers       %s" % _rate(g["gated"], g["acceptable"]))
     print("    (servers labelled SHIP that the gate would block)")
     print()
     for x in m["mismatches"]:
@@ -360,6 +436,7 @@ def main(argv=None):
             with open(a.write_baseline, "w") as f:
                 json.dump({"servers": m["servers"], "tools": m["tools"],
                            "corpus_sha256": fingerprint(servers),
+                           "gate_recall": m["gate_recall"],
                            "floor_recall": {k: {"tp": c["tp"], "n": c["tp"] + c["fn"]}
                                             for k, c in legs.items()}},
                           f, indent=2)

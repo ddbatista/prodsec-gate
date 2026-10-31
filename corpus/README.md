@@ -11,7 +11,25 @@ python -m unittest tests.test_corpus                       # schema + ratchet
 
 The fixtures are committed, so neither command runs any server.
 
-The ratchet only compares like with like. `baseline.json` records a SHA-256 of
+## Reading the numbers
+
+- **Intervals resample servers, not tools.** Tools on one server share a
+  writer and get missed together, so treating 222 tools as independent
+  samples would make the intervals too narrow. The eval draws servers with
+  replacement (2000 seeded resamples) and pools their counts.
+- **Two averages.** "Pooled" counts every tool, so a 28-tool server weighs
+  28 times as much as a 1-tool server. "Per server" averages each server's
+  own rate, so every server counts once. A large gap between them means a
+  few big servers drive the pooled figure.
+- **Server-level results** are what users feel: how many servers labelled
+  GATE are gated, and how many labelled SHIP are blocked. With 20 servers
+  these are thin; read their intervals.
+- **One labeller.** The labels were drafted by one person and reviewed by
+  another, but no inter-labeller agreement has been measured. A different
+  reviewer would move the figures by a few points.
+
+The ratchet holds per-leg recall AND the share of servers labelled GATE that
+stay gated. It only compares like with like. `baseline.json` records a SHA-256 of
 every server's tools, labels and expected verdict. While the corpus is
 unchanged, recall on any leg may never drop. When the corpus changes (a new
 server, a re-captured tool, a corrected label), the test fails until the
