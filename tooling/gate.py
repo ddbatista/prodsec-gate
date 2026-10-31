@@ -52,7 +52,8 @@ def print_instrument(n_tools, live, backend_name, n_failed):
     print(" INSTRUMENT")
     if not live:
         print("  keyword floor only  ·  classifier NOT run  ·  --live adds it")
-        print("  floor recall on the 12-tool corpus: %s" % A.FLOOR_RECALL)
+        print("  floor recall on the real-server corpus (%s): %s"
+              % (A.FLOOR_CORPUS, A.FLOOR_RECALL))
         print("  so SHIP here means 'no keyword matched', NOT 'no capability'.")
     else:
         print("  keyword floor UNION classifier (%s)" % backend_name)

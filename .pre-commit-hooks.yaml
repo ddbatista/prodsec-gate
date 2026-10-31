@@ -1,7 +1,7 @@
 # Consumable by any repo:
 #   repos:
 #     - repo: https://github.com/ddbatista/prodsec-gate
-#       rev: v0.2.0
+#       rev: v0.3.0
 #       hooks: [{id: prodsec-gate}]
 - id: prodsec-gate
   name: prodsec-gate (MCP tools/list vetting)

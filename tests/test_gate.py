@@ -22,7 +22,8 @@ class JsonMode(unittest.TestCase):
         p, m = gate_json(VULNERABLE)
         self.assertEqual(p.returncode, GATE, p.stderr)
         self.assertEqual(m["verdict"], "GATE")
-        for key in ("classifier", "floor_recall_on_corpus", "failed_closed", "basis"):
+        for key in ("classifier", "floor_recall_on_corpus", "floor_corpus",
+                    "failed_closed", "basis"):
             self.assertIn(key, m["instrument"])
 
     def test_json_on_a_harmless_dump_ships(self):

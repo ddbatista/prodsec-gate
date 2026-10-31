@@ -1,9 +1,9 @@
 [
   {"layer": 4,
    "title": "Gate states its own recall floor (line number is stale)",
-   "file": "tooling/gate.py", "line": 12,
-   "quote": "FLOOR_RECALL = \"62.5%\"",
-   "scenario": "Reader trusts SHIP from the offline floor -> misses 37.5% of legs",
+   "file": "tooling/mcp_adapter.py", "line": 12,
+   "quote": "FLOOR_RECALL = ",
+   "scenario": "Reader trusts SHIP from the offline floor -> misses about a third of legs",
    "falsifier": "The floor's measured recall on the corpus is 100%"},
   {"layer": 3,
    "title": "Invented quote",

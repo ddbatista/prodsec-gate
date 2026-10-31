@@ -213,10 +213,12 @@ def infer_signalled(tool, backend=None):
                      % ", ".join(sorted(dropped)))
     return caps | extra, reversible, notes, True
 
-# The keyword floor's measured recall on the 12-tool labelled corpus
-# (tooling/corpus.json, eval_adapter.py). Carried in every manifest's
-# instrument block: a verdict without its denominator is unattributable.
-FLOOR_RECALL = "62.5%"
+# The keyword floor's measured recall on the real-server corpus
+# (corpus/baseline.json, `eval_adapter.py --servers corpus/servers`). Carried
+# in every manifest's instrument block: a verdict without its denominator is
+# unattributable. tests/test_corpus.py fails when these drift from the baseline.
+FLOOR_RECALL = "65.3%"
+FLOOR_CORPUS = "20 servers, 222 tools"
 
 
 def tools_of(dump):
@@ -267,6 +269,7 @@ def build_manifest(dump, backend=None, name="mcp-server", classifier=None,
         "instrument": {
             "classifier": classifier if backend else None,
             "floor_recall_on_corpus": FLOOR_RECALL,
+            "floor_corpus": FLOOR_CORPUS,
             "failed_closed": failed_closed,
             "basis": "declarations",
         },

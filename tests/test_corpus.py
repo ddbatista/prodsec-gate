@@ -221,6 +221,14 @@ class Ratchet(unittest.TestCase):
         servers[0]["labels"]["t1"]["capabilities"] = []
         self.assertNotEqual(E.fingerprint(servers), before)
 
+    def test_printed_floor_recall_is_the_committed_baseline(self):
+        # The installed package does not ship corpus/, so the gate prints a
+        # constant. It must say what the corpus measured, with its size.
+        b = json.load(open(BASELINE))
+        overall = b["floor_recall"]["overall"]
+        self.assertEqual(E.A.FLOOR_RECALL, "%.1f%%" % (100 * overall["tp"] / overall["n"]))
+        self.assertEqual(E.A.FLOOR_CORPUS, "%d servers, %d tools" % (b["servers"], b["tools"]))
+
     def test_baseline_covers_every_leg(self):
         baseline = json.load(open(BASELINE))["floor_recall"]
         self.assertEqual(set(baseline), set(E.A.CAP_VOCAB) | {"overall"})
